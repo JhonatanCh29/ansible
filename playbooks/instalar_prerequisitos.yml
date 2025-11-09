@@ -1,0 +1,58 @@
+---
+# Playbook para instalar servicios faltantes antes del principal
+- name: 🔧 Instalar servicios prerequisitos para Nivel 4
+  hosts: lab_academico
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: 📦 Instalar servicios básicos en Fedora/CentOS
+      package:
+        name:
+          - openssh-server
+          - cronie
+          - rsyslog
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      
+    - name: 📦 Instalar servicios básicos en Ubuntu/Mint
+      package:
+        name:
+          - openssh-server
+          - cron
+          - rsyslog
+        state: present
+      when: ansible_facts['os_family'] == "Debian"
+      
+    - name: 🚀 Habilitar servicios
+      service:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - sshd
+        - crond
+        - rsyslog
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: yes
+      
+    - name: 🚀 Habilitar servicios Ubuntu/Mint
+      service:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - ssh
+        - cron
+        - rsyslog
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: yes
+      
+    - name: 👤 Crear usuario control si no existe
+      user:
+        name: control
+        shell: /bin/bash
+        create_home: yes
+        groups: sudo
+        state: present
+      ignore_errors: yes
