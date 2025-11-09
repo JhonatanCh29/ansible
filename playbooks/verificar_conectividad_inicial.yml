@@ -1,0 +1,71 @@
+---
+# Playbook para configurar red inicial - SOLO después de configurar IPs manualmente
+# Ejecutar este playbook DESPUÉS del script configurar_ips_inicial.sh
+
+- name: 🌐 Configuración inicial de red (post-IP manual)
+  hosts: vm_jhonatan
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Verificar conectividad inicial
+      ansible.builtin.ping:
+      
+    - name: Mostrar configuración de red actual
+      ansible.builtin.command: ip addr show
+      register: ip_config
+      changed_when: false
+      
+    - name: Mostrar configuración de red
+      ansible.builtin.debug:
+        var: ip_config.stdout_lines
+        
+    - name: Verificar que SSH funciona
+      ansible.builtin.command: systemctl status sshd
+      register: ssh_status
+      changed_when: false
+      
+    - name: Asegurar que el forwarding IP está habilitado
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+        
+    - name: Instalar herramientas básicas de red
+      ansible.builtin.package:
+        name:
+          - net-tools
+          - iputils-ping
+          - traceroute
+          - wget
+          - curl
+        state: present
+
+- name: 💻 Verificar cliente mint_jhonatan
+  hosts: mint_jhonatan
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: Verificar conectividad inicial
+      ansible.builtin.ping:
+      
+    - name: Mostrar configuración de red actual
+      ansible.builtin.command: ip addr show
+      register: ip_config_mint
+      changed_when: false
+      
+    - name: Mostrar configuración de red
+      ansible.builtin.debug:
+        var: ip_config_mint.stdout_lines
+        
+    - name: Verificar conectividad con el gateway
+      ansible.builtin.command: ping -c 3 192.168.50.1
+      register: ping_gateway
+      changed_when: false
+      failed_when: false
+      
+    - name: Mostrar resultado del ping
+      ansible.builtin.debug:
+        var: ping_gateway.stdout_lines

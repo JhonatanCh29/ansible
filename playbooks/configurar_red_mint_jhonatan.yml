@@ -1,0 +1,113 @@
+---
+# Playbook para configurar red inicial en mint_jhonatan
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_mint_jhonatan.yml
+
+- name: 💻 Configuración inicial de red - mint_jhonatan (ejecutar EN mint_jhonatan)
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: yes
+  
+  vars:
+    # Ajustar este nombre de interfaz según tu VM
+    lan_interface: "{{ ansible_default_ipv4.interface | default('ens192') }}"
+    
+  tasks:
+    - name: Mostrar interfaces disponibles
+      ansible.builtin.command: ip link show
+      register: interfaces
+      changed_when: false
+      
+    - name: 📋 Interfaces detectadas
+      ansible.builtin.debug:
+        var: interfaces.stdout_lines
+        
+    - name: Detectar distribución
+      ansible.builtin.set_fact:
+        is_mint: "{{ 'mint' in ansible_distribution|lower or 'ubuntu' in ansible_distribution|lower }}"
+        
+    - name: Instalar NetworkManager si no está (Mint/Ubuntu)
+      ansible.builtin.apt:
+        name: network-manager
+        state: present
+        update_cache: yes
+      when: is_mint
+      
+    - name: Asegurar NetworkManager está corriendo
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+        enabled: yes
+        
+    - name: Eliminar conexiones existentes que puedan conflictuar
+      ansible.builtin.command: nmcli connection delete "{{ item }}"
+      loop:
+        - "lan-dhcp"
+        - "Wired connection 1"
+        - "Wired connection 2"
+      failed_when: false
+      changed_when: false
+      
+    - name: 🌐 Configurar interfaz LAN para recibir DHCP
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet 
+        ifname {{ lan_interface }} 
+        con-name lan-dhcp 
+        ipv4.method auto 
+        connection.autoconnect yes
+      register: lan_config
+      failed_when: lan_config.rc != 0 and 'already exists' not in lan_config.stderr
+      
+    - name: 🔌 Activar conexión LAN
+      ansible.builtin.command: nmcli connection up lan-dhcp
+      register: lan_up
+      failed_when: false
+      
+    - name: Esperar a que DHCP asigne IP
+      ansible.builtin.wait_for:
+        timeout: 15
+        
+    - name: 🔄 Renovar DHCP si es necesario
+      ansible.builtin.command: dhclient -r {{ lan_interface }} && dhclient {{ lan_interface }}
+      failed_when: false
+      
+    - name: 📊 Verificar configuración resultante
+      ansible.builtin.command: ip addr show
+      register: final_config
+      changed_when: false
+      
+    - name: 📋 Configuración final de red
+      ansible.builtin.debug:
+        var: final_config.stdout_lines
+        
+    - name: 🔍 Verificar IP asignada
+      ansible.builtin.command: ip -4 addr show {{ lan_interface }}
+      register: ip_check
+      changed_when: false
+      
+    - name: 🌐 Verificar conectividad con gateway
+      ansible.builtin.command: ping -c 3 192.168.50.1
+      register: ping_gateway
+      failed_when: false
+      changed_when: false
+      
+    - name: 📡 Resultado del ping
+      ansible.builtin.debug:
+        var: ping_gateway.stdout_lines
+        
+    - name: 🔑 Asegurar SSH está activo
+      ansible.builtin.systemd:
+        name: ssh
+        state: started
+        enabled: yes
+        
+    - name: 🎯 Mostrar resultado
+      ansible.builtin.debug:
+        msg: |
+          ✅ Configuración de mint_jhonatan completada:
+          - Interfaz {{ lan_interface }} configurada para DHCP
+          - Conectividad con gateway: {{ 'OK' if ping_gateway.rc == 0 else 'ERROR' }}
+          - SSH: Activo
+          
+          🔥 Si tienes IP asignada, puedes conectarte desde la VM de control:
+          ssh jhonatan@[IP_ASIGNADA]

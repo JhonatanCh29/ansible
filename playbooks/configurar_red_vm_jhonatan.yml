@@ -1,0 +1,118 @@
+---
+# Playbook para configurar red inicial ejecutándose LOCALMENTE en cada VM
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_local.yml
+
+- name: 🌐 Configuración inicial de red - vm_jhonatan (ejecutar EN vm_jhonatan)
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: yes
+  
+  vars:
+    # Ajustar estos nombres de interfaz según tu VM
+    lan_interface: "{{ ansible_default_ipv4.interface | default('ens192') }}"
+    wan_interface: "ens33"  # Ajustar si es diferente
+    
+  tasks:
+    - name: Mostrar interfaces disponibles
+      ansible.builtin.command: ip link show
+      register: interfaces
+      changed_when: false
+      
+    - name: 📋 Interfaces detectadas
+      ansible.builtin.debug:
+        var: interfaces.stdout_lines
+        
+    - name: Detectar si estamos en Fedora
+      ansible.builtin.set_fact:
+        is_fedora: "{{ ansible_distribution == 'Fedora' }}"
+        
+    - name: Instalar NetworkManager en Fedora si no está
+      ansible.builtin.dnf:
+        name: NetworkManager
+        state: present
+      when: is_fedora
+      
+    - name: Instalar NetworkManager en Debian/Ubuntu si no está
+      ansible.builtin.apt:
+        name: network-manager
+        state: present
+        update_cache: yes
+      when: not is_fedora
+      
+    - name: Asegurar NetworkManager está corriendo
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+        enabled: yes
+        
+    - name: Eliminar conexiones existentes que puedan conflictuar
+      ansible.builtin.command: nmcli connection delete "{{ item }}"
+      loop:
+        - "lab-lan"
+        - "wan-dhcp"
+        - "Wired connection 1"
+        - "Wired connection 2"
+      failed_when: false
+      changed_when: false
+      
+    - name: 🌐 Configurar interfaz LAN con IP estática (192.168.50.1)
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet 
+        ifname {{ lan_interface }} 
+        con-name lab-lan 
+        ipv4.method manual 
+        ipv4.addresses 192.168.50.1/24 
+        connection.autoconnect yes
+      register: lan_config
+      failed_when: lan_config.rc != 0 and 'already exists' not in lan_config.stderr
+      
+    - name: 🌍 Configurar interfaz WAN con DHCP
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet 
+        ifname {{ wan_interface }} 
+        con-name wan-dhcp 
+        ipv4.method auto 
+        connection.autoconnect yes
+      register: wan_config
+      failed_when: wan_config.rc != 0 and 'already exists' not in wan_config.stderr
+      
+    - name: 🔌 Activar conexión LAN
+      ansible.builtin.command: nmcli connection up lab-lan
+      register: lan_up
+      failed_when: false
+      
+    - name: 🔌 Activar conexión WAN  
+      ansible.builtin.command: nmcli connection up wan-dhcp
+      register: wan_up
+      failed_when: false
+      
+    - name: Esperar a que las interfaces se configuren
+      ansible.builtin.wait_for:
+        timeout: 10
+        
+    - name: 📊 Verificar configuración resultante
+      ansible.builtin.command: ip addr show
+      register: final_config
+      changed_when: false
+      
+    - name: 📋 Configuración final de red
+      ansible.builtin.debug:
+        var: final_config.stdout_lines
+        
+    - name: 🔑 Asegurar SSH está activo para conexiones remotas
+      ansible.builtin.systemd:
+        name: "{{ 'sshd' if is_fedora else 'ssh' }}"
+        state: started
+        enabled: yes
+        
+    - name: 🎯 Mostrar resultado
+      ansible.builtin.debug:
+        msg: |
+          ✅ Configuración de vm_jhonatan completada:
+          - IP LAN: 192.168.50.1/24 en {{ lan_interface }}
+          - WAN: DHCP en {{ wan_interface }}
+          - SSH: Activo
+          
+          🔥 Ahora puedes conectarte por SSH desde la VM de control:
+          ssh jhonatan@192.168.50.1
