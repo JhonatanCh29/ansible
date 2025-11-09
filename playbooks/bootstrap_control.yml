@@ -38,12 +38,19 @@
       become: true
       become_user: root
 
-    - name: Install python packages (ansible-lint, yamllint) into the venv
+    - name: Install python packages (ansible-core, ansible-lint, yamllint) into the venv
       ansible.builtin.pip:
         name:
+          - ansible-core
           - ansible-lint
           - yamllint
         virtualenv: "{{ venv_path }}"
+      become: true
+      become_user: root
+
+    - name: Install common Ansible collections (community.general) into the user's environment
+      ansible.builtin.command:
+        cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general"
       become: true
       become_user: root
 
