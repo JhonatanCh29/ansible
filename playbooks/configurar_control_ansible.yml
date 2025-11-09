@@ -67,7 +67,7 @@
         # Crear directorio de inventario si no existe
         mkdir -p ~/ansible/inventory/group_vars
         
-        # Crear hosts.yml actualizado
+        # Crear hosts.yml SIN vault (usando SSH keys)
         cat > ~/ansible/inventory/hosts.yml << 'EOF'
         ---
         all:
@@ -77,15 +77,11 @@
                 vm_jhonatan:
                   ansible_host: 192.168.50.1
                   ansible_user: jhonatan
-                  ansible_ssh_pass: "{{ vault_jhonatan_password }}"
-                  ansible_become_pass: "{{ vault_jhonatan_password }}"
                   vm_role: router
                   os_type: fedora
                 mint_jhonatan:
                   ansible_host: 192.168.50.20
                   ansible_user: jhonatan
-                  ansible_ssh_pass: "{{ vault_jhonatan_password }}"
-                  ansible_become_pass: "{{ vault_jhonatan_password }}"
                   vm_role: client
                   os_type: mint
               vars:
@@ -105,8 +101,6 @@
         host_key_checking = False
         timeout = 30
         remote_user = jhonatan
-        ask_pass = True
-        ask_become_pass = True
         
         [inventory]
         enable_plugins = yaml
