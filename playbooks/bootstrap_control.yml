@@ -48,9 +48,9 @@
       become: true
       become_user: root
 
-    - name: Install common Ansible collections (community.general) into the user's environment
+    - name: Install common Ansible collections (community.general, ansible.posix) into the user's environment
       ansible.builtin.command:
-        cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general"
+        cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general ansible.posix"
       become: true
       become_user: root
 

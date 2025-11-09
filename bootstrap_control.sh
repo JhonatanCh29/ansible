@@ -21,7 +21,7 @@ pip install ansible-lint yamllint
 echo "==> Instalando ansible-core y colecciones útiles en el virtualenv"
 pip install ansible-core
 # instalar una colección muy usada (ajusta si no la necesitas)
-~/.ansible-venv/bin/ansible-galaxy collection install community.general || true
+~/.ansible-venv/bin/ansible-galaxy collection install community.general ansible.posix || true
 deactivate
 echo "Herramientas instaladas en ~/.ansible-venv. Úsalas con: source ~/.ansible-venv/bin/activate && ansible-lint"
 
