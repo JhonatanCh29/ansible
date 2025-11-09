@@ -16,9 +16,13 @@
 - name: Fail if lan_interface or wan_interface not set
   ansible.builtin.assert:
     that:
-      - lan_interface != ''
-      - wan_interface != ''
-    fail_msg: "You must set lan_interface and wan_interface (see roles/red_lab/vars/main.yml or use group_vars/host_vars)."
+      - lan_interface is defined
+      - lan_interface != ""
+      - lan_interface != "ens192"  # valor por defecto a cambiar
+      - wan_interface is defined  
+      - wan_interface != ""
+      - wan_interface != "ens33"   # valor por defecto a cambiar
+    fail_msg: "You must set lan_interface and wan_interface (see roles/red_lab/vars/main.yml or use group_vars/host_vars). Current: lan={{ lan_interface|default('undefined') }}, wan={{ wan_interface|default('undefined') }}"
 
 - name: Deploy dnsmasq configuration for lab
   ansible.builtin.template:
