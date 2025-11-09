@@ -1,0 +1,58 @@
+---
+# Playbook simplificado para instalar servicios básicos
+- name: 🔧 Instalar servicios prerequisitos (simplificado)
+  hosts: lab_academico
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: 📦 Instalar openssh-server en Fedora
+      package:
+        name: openssh-server
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      
+    - name: 📦 Instalar cron en Fedora
+      package:
+        name: cronie
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      
+    - name: 📦 Instalar servicios en Ubuntu/Mint
+      package:
+        name:
+          - openssh-server
+          - cron
+        state: present
+      when: ansible_facts['os_family'] == "Debian"
+      
+    - name: 🚀 Habilitar SSH en Fedora
+      service:
+        name: sshd
+        enabled: yes
+        state: started
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: yes
+      
+    - name: 🚀 Habilitar cron en Fedora
+      service:
+        name: crond
+        enabled: yes
+        state: started
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: yes
+      
+    - name: 🚀 Habilitar servicios en Ubuntu/Mint
+      service:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - ssh
+        - cron
+      when: ansible_facts['os_family'] == "Debian"
+      ignore_errors: yes
+      
+    - name: ✅ Verificar servicios instalados
+      debug:
+        msg: "Servicios básicos instalados en {{ inventory_hostname }}"

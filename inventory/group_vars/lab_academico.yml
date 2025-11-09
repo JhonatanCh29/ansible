@@ -2,8 +2,8 @@
 # Example group vars for lab_academico group
 # Edit these values to match your VM interface names and IP plan.
 
-lan_interface: "ens192"        # interface connected to PSwitch_Jhona (LAN)
-wan_interface: "ens33"         # interface connected to VM Network (WAN/Internet)
+lan_interface: "ens34"        # interface connected to PSwitch_Jhona (LAN) - CORREGIDO
+wan_interface: "ens35"         # interface connected to VM Network (WAN/Internet) - CORREGIDO
 lan_gateway_ip: "192.168.50.1"
 lan_dhcp_start: "192.168.50.100"
 lan_dhcp_end: "192.168.50.200"

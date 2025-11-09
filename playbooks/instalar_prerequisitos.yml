@@ -48,11 +48,22 @@
       when: ansible_facts['os_family'] == "Debian"
       ignore_errors: yes
       
-    - name: 👤 Crear usuario control si no existe
+    - name: 👤 Crear usuario control en Fedora/CentOS (grupo wheel)
+      user:
+        name: control
+        shell: /bin/bash
+        create_home: yes
+        groups: wheel
+        state: present
+      when: ansible_facts['os_family'] == "RedHat"
+      ignore_errors: yes
+      
+    - name: 👤 Crear usuario control en Ubuntu/Mint (grupo sudo)
       user:
         name: control
         shell: /bin/bash
         create_home: yes
         groups: sudo
         state: present
+      when: ansible_facts['os_family'] == "Debian"
       ignore_errors: yes
