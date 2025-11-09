@@ -1,5 +1,12 @@
-- name: 🛠️ Gestión de procesos y servicios en laboratorios
-  hosts: all   # O el grupo de tu inventario, como "laboratorio_1"
+---
+- name: 🎯 Implementación completa Ansible Nivel 4 - Laboratorio Académico
+  hosts: lab_academico
   become: yes
+  gather_facts: yes
+  
   roles:
-    - gestion_procesos_servicios
+    - almacenamiento_sistemas
+    - procesos_servicios
+    - red_lab  
+    - tareas_automatizadas
+    - usuarios_permisos
