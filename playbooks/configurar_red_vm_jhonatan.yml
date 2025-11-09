@@ -1,6 +1,6 @@
 ---
 # Playbook para configurar red inicial en vm_jhonatan
-# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_vm_jhonatan.yml
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_vm_jhonatan.yml --become-method=sudo -K
 
 - name: 🌐 Configuración de red - vm_jhonatan
   hosts: localhost
@@ -33,12 +33,12 @@
         nmcli connection show | grep ens35 | awk '{print $1}' | xargs -r nmcli connection delete 2>/dev/null || true
         ip link set ens35 up 2>/dev/null || true
         
-    - name: � Instalar NetworkManager
+    - name: 📦 Instalar NetworkManager
       raw: dnf install -y NetworkManager
       
     - name: 🔌 Activar NetworkManager
       raw: systemctl enable --now NetworkManager
-        
+      
     - name: 🌐 Configurar ens34 LAN
       raw: nmcli connection add type ethernet ifname ens34 con-name lab-lan ipv4.method manual ipv4.addresses 192.168.50.1/24 connection.autoconnect yes
       
@@ -64,7 +64,7 @@
       raw: ip addr show ens34
       register: ens34_result
       
-    - name: 📊 Verificar ens35
+    - name: � Verificar ens35
       raw: ip addr show ens35
       register: ens35_result
       
