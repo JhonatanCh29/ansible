@@ -10,8 +10,8 @@
   loop:
     - sshd  # Corregido: usar sshd en lugar de ssh
     - crond  # Corregido: usar crond en lugar de cron (Fedora)
-  ignore_errors: yes  # Ignorar errores si algunos servicios no existen
     - systemd-logind
+  ignore_errors: yes  # Ignorar errores si algunos servicios no existen
   tags: servicios
 
 # Opcional: crear un directorio de logs en el host remoto si se definió `logs_dir`
