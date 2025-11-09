@@ -2,16 +2,30 @@
 # 📌 Rol 1: Gestión de procesos y servicios
 
 # ✅ 1. Verificar si ciertos servicios están activos
-- name: Verificar estado de servicios esenciales
+- name: Verificar estado de servicios esenciales (Fedora/CentOS)
   ansible.builtin.systemd:
     name: "{{ item }}"
     state: started
     enabled: yes
   loop:
-    - sshd  # Corregido: usar sshd en lugar de ssh
-    - crond  # Corregido: usar crond en lugar de cron (Fedora)
+    - sshd
+    - crond  # crond en Fedora
     - systemd-logind
-  ignore_errors: yes  # Ignorar errores si algunos servicios no existen
+  ignore_errors: yes
+  when: ansible_facts['os_family'] == "RedHat"
+  tags: servicios
+
+- name: Verificar estado de servicios esenciales (Ubuntu/Mint)
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - sshd
+    - cron   # cron en Ubuntu/Mint
+    - systemd-logind
+  ignore_errors: yes
+  when: ansible_facts['os_family'] == "Debian"
   tags: servicios
 
 # Opcional: crear un directorio de logs en el host remoto si se definió `logs_dir`

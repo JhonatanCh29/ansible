@@ -22,7 +22,7 @@
       - sudo
       - passwd
       - libpam-pwquality  # En Ubuntu se llama libpam-pwquality
-      - shadow-utils
+      # shadow-utils no existe en Ubuntu/Mint - se omite
     state: present
   when: ansible_facts['os_family'] == "Debian"
   ignore_errors: yes
