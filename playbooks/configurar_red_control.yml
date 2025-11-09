@@ -1,0 +1,119 @@
+---
+# Playbook para configurar red en la VM de control
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_control.yml
+
+- name: 💻 Configuración de red - VM de control (ejecutar EN la VM de control)
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: yes
+  
+  vars:
+    # Ajustar este nombre de interfaz según tu VM de control
+    lan_interface: "{{ ansible_default_ipv4.interface | default('ens192') }}"
+    control_ip: "192.168.50.10"  # IP estática para la VM de control
+    
+  tasks:
+    - name: Mostrar interfaces disponibles
+      ansible.builtin.command: ip link show
+      register: interfaces
+      changed_when: false
+      
+    - name: 📋 Interfaces detectadas
+      ansible.builtin.debug:
+        var: interfaces.stdout_lines
+        
+    - name: Detectar distribución
+      ansible.builtin.set_fact:
+        is_mint: "{{ 'mint' in ansible_distribution|lower or 'ubuntu' in ansible_distribution|lower }}"
+        
+    - name: Instalar NetworkManager si no está (Mint/Ubuntu)
+      ansible.builtin.apt:
+        name: network-manager
+        state: present
+        update_cache: yes
+      when: is_mint
+      
+    - name: Asegurar NetworkManager está corriendo
+      ansible.builtin.systemd:
+        name: NetworkManager
+        state: started
+        enabled: yes
+        
+    - name: Eliminar conexiones existentes que puedan conflictuar
+      ansible.builtin.command: nmcli connection delete "{{ item }}"
+      loop:
+        - "control-lan"
+        - "Wired connection 1"
+        - "Wired connection 2"
+      failed_when: false
+      changed_when: false
+      
+    - name: 🌐 Configurar interfaz con IP estática en la red del laboratorio
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet 
+        ifname {{ lan_interface }} 
+        con-name control-lan 
+        ipv4.method manual 
+        ipv4.addresses {{ control_ip }}/24 
+        ipv4.gateway 192.168.50.1
+        ipv4.dns "192.168.50.1 8.8.8.8"
+        connection.autoconnect yes
+      register: lan_config
+      failed_when: lan_config.rc != 0 and 'already exists' not in lan_config.stderr
+      
+    - name: 🔌 Activar conexión LAN
+      ansible.builtin.command: nmcli connection up control-lan
+      register: lan_up
+      failed_when: false
+      
+    - name: Esperar a que la interfaz se configure
+      ansible.builtin.wait_for:
+        timeout: 10
+        
+    - name: 📊 Verificar configuración resultante
+      ansible.builtin.command: ip addr show
+      register: final_config
+      changed_when: false
+      
+    - name: 📋 Configuración final de red
+      ansible.builtin.debug:
+        var: final_config.stdout_lines
+        
+    - name: 🌐 Verificar conectividad con vm_jhonatan (gateway)
+      ansible.builtin.command: ping -c 3 192.168.50.1
+      register: ping_gateway
+      failed_when: false
+      changed_when: false
+      
+    - name: 📡 Resultado del ping al gateway
+      ansible.builtin.debug:
+        var: ping_gateway.stdout_lines
+        
+    - name: 🔍 Verificar conectividad con mint_jhonatan (si está en línea)
+      ansible.builtin.command: ping -c 2 192.168.50.100
+      register: ping_mint
+      failed_when: false
+      changed_when: false
+      
+    - name: 📡 Resultado del ping a mint_jhonatan
+      ansible.builtin.debug:
+        var: ping_mint.stdout_lines
+      when: ping_mint.rc == 0
+        
+    - name: 🔑 Verificar que SSH cliente está instalado
+      ansible.builtin.package:
+        name: openssh-client
+        state: present
+        
+    - name: 🎯 Mostrar resultado final
+      ansible.builtin.debug:
+        msg: |
+          ✅ Configuración de VM de control completada:
+          - IP: {{ control_ip }}/24 en {{ lan_interface }}
+          - Gateway: 192.168.50.1 (vm_jhonatan)
+          - DNS: 192.168.50.1, 8.8.8.8
+          - Conectividad con gateway: {{ 'OK' if ping_gateway.rc == 0 else 'ERROR' }}
+          
+          🔥 Ahora puedes usar Ansible para gestionar las otras VMs:
+          ansible all -m ping
