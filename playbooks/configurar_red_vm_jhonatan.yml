@@ -9,9 +9,9 @@
   gather_facts: yes
   
   vars:
-    # Ajustar estos nombres de interfaz según tu VM
-    lan_interface: "{{ ansible_default_ipv4.interface | default('ens192') }}"
-    wan_interface: "ens33"  # Ajustar si es diferente
+    # Interfaces correctas según ip addr show
+    lan_interface: "ens34"  # Interfaz para la red local del laboratorio
+    wan_interface: "ens35"  # Interfaz para WAN/Internet
     
   tasks:
     - name: Mostrar interfaces disponibles

@@ -9,8 +9,8 @@
   gather_facts: yes
   
   vars:
-    # Ajustar este nombre de interfaz según tu VM de control
-    lan_interface: "{{ ansible_default_ipv4.interface | default('ens192') }}"
+    # Interfaz correcta según ip addr show
+    lan_interface: "ens34"  # Interfaz para la red local del laboratorio
     control_ip: "192.168.50.10"  # IP estática para la VM de control
     
   tasks:
