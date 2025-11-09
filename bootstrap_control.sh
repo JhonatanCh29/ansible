@@ -12,9 +12,14 @@ sudo apt install -y software-properties-common apt-transport-https ca-certificat
 echo "==> Instalando paquetes esenciales"
 sudo apt install -y python3 python3-venv python3-pip git ansible sshpass vim
 
-echo "==> Instalando herramientas Python útiles (usuario)"
-python3 -m pip install --user --upgrade pip
-python3 -m pip install --user ansible-lint yamllint
+echo "==> Instalando herramientas Python útiles dentro de un virtualenv (~/.ansible-venv)"
+# Crear virtualenv en el home del usuario 'control' y usarlo para instalar linters
+python3 -m venv ~/.ansible-venv
+source ~/.ansible-venv/bin/activate
+pip install --upgrade pip
+pip install ansible-lint yamllint
+deactivate
+echo "Herramientas instaladas en ~/.ansible-venv. Úsalas con: source ~/.ansible-venv/bin/activate && ansible-lint"
 
 echo "==> Creando estructura recomendada del repo (si no existe)"
 [ -d ~/ansible ] || mkdir -p ~/ansible

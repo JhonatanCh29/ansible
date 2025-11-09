@@ -26,13 +26,33 @@
         state: present
         install_recommends: no
 
-    - name: Install python user packages (ansible-lint, yamllint)
+    - name: Set control user and venv path
+      ansible.builtin.set_fact:
+        control_user: control
+        venv_path: "/home/control/.ansible-venv"
+
+    - name: Create python virtualenv for control user
+      ansible.builtin.command:
+        cmd: python3 -m venv {{ venv_path }}
+        creates: "{{ venv_path }}/bin/activate"
+      become: true
+      become_user: root
+
+    - name: Install python packages (ansible-lint, yamllint) into the venv
       ansible.builtin.pip:
         name:
           - ansible-lint
           - yamllint
-        executable: pip3
-        state: present
+        virtualenv: "{{ venv_path }}"
+      become: true
+      become_user: root
+
+    - name: Ensure venv ownership is control user
+      ansible.builtin.file:
+        path: "{{ venv_path }}"
+        owner: "{{ control_user }}"
+        group: "{{ control_user }}"
+        recurse: yes
 
     - name: Ensure ~/.ssh exists
       ansible.builtin.file:
