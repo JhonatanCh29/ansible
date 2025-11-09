@@ -1,76 +1,45 @@
 ---
-# Playbook para configurar red inicial ejecutándose LOCALMENTE en cada VM
-# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_local.yml
+# Playbook para configurar red inicial en vm_jhonatan
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_vm_jhonatan_limpio.yml
 
-- name: 🌐 Configuración inicial de red - vm_jhonatan (ejecutar EN vm_jhonatan)
+- name: 🌐 Configuración de red - vm_jhonatan (ejecutar EN vm_jhonatan)
   hosts: localhost
   become: yes
   connection: local
   gather_facts: yes
   
   vars:
-    # Interfaces correctas según ip addr show
     lan_interface: "ens34"  # Interfaz para la red local del laboratorio
     wan_interface: "ens35"  # Interfaz para WAN/Internet
     
   tasks:
-    - name: Mostrar interfaces disponibles
-      ansible.builtin.command: ip link show
-      register: interfaces
-      changed_when: false
-      
-    - name: 📋 Interfaces detectadas
-      ansible.builtin.debug:
-        var: interfaces.stdout_lines
-        
-    - name: 🧹 LIMPIAR COMPLETAMENTE la interfaz ens34
+    - name: 🧹 LIMPIAR interfaz ens34
       ansible.builtin.shell: |
-        # Bajar la interfaz
         ip link set ens34 down 2>/dev/null || true
-        # Limpiar cualquier IP asignada
         ip addr flush dev ens34 2>/dev/null || true
-        # Eliminar todas las conexiones de NetworkManager en ens34
         nmcli connection show | grep ens34 | awk '{print $1}' | xargs -r nmcli connection delete 2>/dev/null || true
-        # Subir la interfaz limpia
+        ip route flush dev ens34 2>/dev/null || true
         ip link set ens34 up 2>/dev/null || true
       register: cleanup_ens34
       
-    - name: 📋 Resultado de limpieza ens34
-      ansible.builtin.debug:
-        var: cleanup_ens34.stdout_lines
-        
-    - name: 🧹 LIMPIAR COMPLETAMENTE la interfaz ens35
+    - name: 🧹 LIMPIAR interfaz ens35
       ansible.builtin.shell: |
-        # Bajar la interfaz  
         ip link set ens35 down 2>/dev/null || true
-        # Limpiar cualquier IP asignada
         ip addr flush dev ens35 2>/dev/null || true
-        # Eliminar todas las conexiones de NetworkManager en ens35
         nmcli connection show | grep ens35 | awk '{print $1}' | xargs -r nmcli connection delete 2>/dev/null || true
-        # Subir la interfaz limpia
+        ip route flush dev ens35 2>/dev/null || true
         ip link set ens35 up 2>/dev/null || true
       register: cleanup_ens35
       
-    - name: 📋 Resultado de limpieza ens35
+    - name: 📋 Resultado de limpieza
       ansible.builtin.debug:
-        var: cleanup_ens35.stdout_lines
+        msg: "Interfaces ens34 y ens35 limpiadas"
         
-    - name: Detectar si estamos en Fedora
-      ansible.builtin.set_fact:
-        is_fedora: "{{ ansible_distribution == 'Fedora' }}"
-        
-    - name: Instalar NetworkManager en Fedora si no está
+    - name: Instalar NetworkManager en Fedora
       ansible.builtin.dnf:
         name: NetworkManager
         state: present
-      when: is_fedora
-      
-    - name: Instalar NetworkManager en Debian/Ubuntu si no está
-      ansible.builtin.apt:
-        name: network-manager
-        state: present
-        update_cache: yes
-      when: not is_fedora
+      when: ansible_distribution == 'Fedora'
       
     - name: Asegurar NetworkManager está corriendo
       ansible.builtin.systemd:
@@ -78,20 +47,10 @@
         state: started
         enabled: yes
         
-    - name: Eliminar conexiones existentes que puedan conflictuar
-      ansible.builtin.command: nmcli connection delete "{{ item }}"
-      loop:
-        - "lab-lan"
-        - "wan-dhcp"
-        - "Wired connection 1"
-        - "Wired connection 2"
-      failed_when: false
-      changed_when: false
-      
-    - name: 🌐 Configurar interfaz LAN con IP estática (192.168.50.1)
+    - name: 🌐 Configurar ens34 con IP estática del laboratorio
       ansible.builtin.command: >-
         nmcli connection add type ethernet 
-        ifname {{ lan_interface }} 
+        ifname ens34 
         con-name lab-lan 
         ipv4.method manual 
         ipv4.addresses 192.168.50.1/24 
@@ -99,10 +58,10 @@
       register: lan_config
       failed_when: lan_config.rc != 0 and 'already exists' not in lan_config.stderr
       
-    - name: 🌍 Configurar interfaz WAN con DHCP
+    - name: 🌍 Configurar ens35 para WAN con DHCP
       ansible.builtin.command: >-
         nmcli connection add type ethernet 
-        ifname {{ wan_interface }} 
+        ifname ens35 
         con-name wan-dhcp 
         ipv4.method auto 
         connection.autoconnect yes
@@ -114,68 +73,55 @@
       register: lan_up
       failed_when: false
       
-    - name: 🔌 Activar conexión WAN  
+    - name: 🔌 Activar conexión WAN
       ansible.builtin.command: nmcli connection up wan-dhcp
       register: wan_up
       failed_when: false
+      
+    - name: Esperar configuración de interfaces
+      ansible.builtin.wait_for:
+        timeout: 10
         
-    - name: 🚀 Habilitar forwarding IP para funcionar como router
-      ansible.builtin.sysctl:
-        name: net.ipv4.ip_forward
-        value: '1'
-        state: present
-        reload: yes
-        
+    - name: 🚀 Habilitar forwarding IP
+      ansible.builtin.command: sysctl -w net.ipv4.ip_forward=1
+      
     - name: 📝 Hacer forwarding IP persistente
       ansible.builtin.lineinfile:
         path: /etc/sysctl.conf
         line: 'net.ipv4.ip_forward=1'
         create: yes
-      
-    - name: Esperar a que las interfaces se configuren
-      ansible.builtin.wait_for:
-        timeout: 10
         
-    - name: 📊 Verificar configuración resultante
-      ansible.builtin.command: ip addr show
-      register: final_config
-      changed_when: false
-      
-    - name: 📋 Configuración final de red
-      ansible.builtin.debug:
-        var: final_config.stdout_lines
-        
-    - name: 🔑 Asegurar SSH está activo para conexiones remotas
+    - name: 🔑 Activar SSH
       ansible.builtin.systemd:
-        name: "{{ 'sshd' if is_fedora else 'ssh' }}"
+        name: sshd
         state: started
         enabled: yes
         
-    - name: 📊 Verificar configuración de ens34 (LAN)
+    - name: 📊 Verificar ens34
       ansible.builtin.command: ip addr show ens34
-      register: ens34_config
+      register: ens34_check
       changed_when: false
       
-    - name: 📊 Verificar configuración de ens35 (WAN)
+    - name: 📊 Verificar ens35
       ansible.builtin.command: ip addr show ens35
-      register: ens35_config
+      register: ens35_check
       changed_when: false
       
-    - name: 📋 Mostrar configuración de ens34
+    - name: 📋 Mostrar configuración ens34
       ansible.builtin.debug:
-        var: ens34_config.stdout_lines
+        var: ens34_check.stdout_lines
         
-    - name: 📋 Mostrar configuración de ens35
+    - name: 📋 Mostrar configuración ens35
       ansible.builtin.debug:
-        var: ens35_config.stdout_lines
+        var: ens35_check.stdout_lines
         
-    - name: 🎯 Mostrar resultado
+    - name: 🎯 Resultado final
       ansible.builtin.debug:
         msg: |
-          ✅ Configuración de vm_jhonatan completada:
-          - IP LAN: 192.168.50.1/24 en {{ lan_interface }}
-          - WAN: DHCP en {{ wan_interface }}
+          ✅ vm_jhonatan configurada como router:
+          - ens34: 192.168.50.1/24 (LAN del laboratorio)
+          - ens35: DHCP (WAN/Internet)
+          - Forwarding IP: Habilitado
           - SSH: Activo
           
-          🔥 Ahora puedes conectarte por SSH desde la VM de control:
-          ssh jhonatan@192.168.50.1
+          🔥 Conectarse desde VM control: ssh jhonatan@192.168.50.1
