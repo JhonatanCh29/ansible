@@ -71,6 +71,24 @@
       ansible.builtin.wait_for:
         timeout: 10
         
+    - name: 📊 Verificar configuración de ens34
+      ansible.builtin.command: ip addr show ens34
+      register: ens34_config
+      changed_when: false
+      
+    - name: 📊 Verificar tabla de rutas
+      ansible.builtin.command: ip route show
+      register: route_config
+      changed_when: false
+      
+    - name: 📋 Mostrar configuración de ens34
+      ansible.builtin.debug:
+        var: ens34_config.stdout_lines
+        
+    - name: 📋 Mostrar tabla de rutas
+      ansible.builtin.debug:
+        var: route_config.stdout_lines
+        
     - name: 📊 Verificar configuración resultante
       ansible.builtin.command: ip addr show
       register: final_config

@@ -87,6 +87,19 @@
       register: wan_up
       failed_when: false
       
+    - name: 🚀 Habilitar forwarding IP para funcionar como router
+      ansible.builtin.sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
+        
+    - name: 📝 Hacer forwarding IP persistente
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.conf
+        line: 'net.ipv4.ip_forward=1'
+        create: yes
+      
     - name: Esperar a que las interfaces se configuren
       ansible.builtin.wait_for:
         timeout: 10
@@ -105,6 +118,24 @@
         name: "{{ 'sshd' if is_fedora else 'ssh' }}"
         state: started
         enabled: yes
+        
+    - name: 📊 Verificar configuración de ens34 (LAN)
+      ansible.builtin.command: ip addr show ens34
+      register: ens34_config
+      changed_when: false
+      
+    - name: 📊 Verificar configuración de ens35 (WAN)
+      ansible.builtin.command: ip addr show ens35
+      register: ens35_config
+      changed_when: false
+      
+    - name: 📋 Mostrar configuración de ens34
+      ansible.builtin.debug:
+        var: ens34_config.stdout_lines
+        
+    - name: 📋 Mostrar configuración de ens35
+      ansible.builtin.debug:
+        var: ens35_config.stdout_lines
         
     - name: 🎯 Mostrar resultado
       ansible.builtin.debug:

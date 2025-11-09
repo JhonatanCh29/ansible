@@ -71,6 +71,15 @@
       ansible.builtin.command: dhclient -r {{ lan_interface }} && dhclient {{ lan_interface }}
       failed_when: false
       
+    - name: 📊 Verificar configuración de ens34
+      ansible.builtin.command: ip addr show ens34
+      register: ens34_config
+      changed_when: false
+      
+    - name: 📋 Mostrar configuración de ens34
+      ansible.builtin.debug:
+        var: ens34_config.stdout_lines
+      
     - name: 📊 Verificar configuración resultante
       ansible.builtin.command: ip addr show
       register: final_config
