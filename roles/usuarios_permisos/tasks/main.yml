@@ -1,0 +1,58 @@
+---
+# 📌 Rol 2: Administración de usuarios, permisos y políticas
+
+# ✅ 1. Crear grupos necesarios
+- name: Crear grupos básicos
+  ansible.builtin.group:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - docentes
+    - soporte
+    - laboratorio
+
+# ✅ 2. Crear usuarios y asignarlos a grupos
+- name: Crear usuarios y asignarles grupo
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: present
+    groups: "{{ item.group }}"
+    shell: /bin/bash
+    create_home: yes
+  loop:
+    - { name: "adminlab", group: "laboratorio" }
+    - { name: "tecnico1", group: "soporte" }
+    - { name: "profesor1", group: "docentes" }
+
+# ✅ 3. Establecer contraseña a los usuarios (opcional)
+# ⚠ La contraseña debe estar en formato encriptado SHA512
+- name: Colocar contraseñas a usuarios
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    password: "{{ item.pass }}"
+  loop:
+    - { name: "adminlab",  pass: "{{ 'admin123' | password_hash('sha512') }}" }
+    - { name: "tecnico1",  pass: "{{ 'tecnico123' | password_hash('sha512') }}" }
+    - { name: "profesor1", pass: "{{ 'prof123' | password_hash('sha512') }}" }
+
+# ✅ 4. Habilitar sudo sin contraseña a un usuario específico
+- name: Permitir sudo sin contraseña a adminlab
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/adminlab
+    content: "adminlab ALL=(ALL) NOPASSWD:ALL"
+    owner: root
+    group: root
+    mode: '0440'
+
+# ✅ 5. Asegurar permisos correctos en /home
+- name: Asignar dueño correcto a los home de cada usuario
+  ansible.builtin.file:
+    path: "/home/{{ item }}"
+    owner: "{{ item }}"
+    group: "{{ item }}"
+    state: directory
+    recurse: yes
+  loop:
+    - adminlab
+    - tecnico1
+    - profesor1

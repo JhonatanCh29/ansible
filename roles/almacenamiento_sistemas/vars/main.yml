@@ -1,0 +1,6 @@
+# roles/gestion_procesos_servicios/vars/main.yml
+
+servicios_esenciales:
+  - ssh
+  - cron
+  - systemd-logind

@@ -1,0 +1,20 @@
+---
+# Default variables for the lab network role. Override these in inventory/group_vars/host_vars.
+
+# Interface that faces the LAB LAN (PSwitch_Jhona). Must match the guest OS interface name.
+lan_interface: ""            # e.g. "ens192" or "eth1"
+
+# Interface that faces the WAN/Internet (VM Network).
+wan_interface: ""            # e.g. "ens33"
+
+# LAN addressing and DHCP pool (example subnet and gateway)
+lan_subnet: "192.168.50.0/24"
+lan_gateway_ip: "192.168.50.1"
+lan_dhcp_start: "192.168.50.100"
+lan_dhcp_end: "192.168.50.200"
+dhcp_lease_time: "12h"
+
+# Upstream DNS servers used by dnsmasq
+dns_forwarders:
+  - "8.8.8.8"
+  - "8.8.4.4"

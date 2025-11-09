@@ -1,0 +1,96 @@
+# tasks for red_lab role
+---
+- name: Ensure dnsmasq is installed
+  ansible.builtin.package:
+    name: dnsmasq
+    state: present
+
+- name: Ensure directory for dnsmasq drops exists
+  ansible.builtin.file:
+    path: /etc/dnsmasq.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Fail if lan_interface or wan_interface not set
+  ansible.builtin.assert:
+    that:
+      - lan_interface != ''
+      - wan_interface != ''
+    fail_msg: "You must set lan_interface and wan_interface (see roles/red_lab/vars/main.yml or use group_vars/host_vars)."
+
+- name: Deploy dnsmasq configuration for lab
+  ansible.builtin.template:
+    src: dnsmasq.conf.j2
+    dest: /etc/dnsmasq.d/lab.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart dnsmasq
+
+- name: Enable IP forwarding (runtime + persistent)
+  ansible.builtin.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+- name: Ensure directory for iptables rules exists
+  ansible.builtin.file:
+    path: /etc/iptables
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Ensure NAT iptables POSTROUTING rule is present (temporary check then add)
+  ansible.builtin.shell: |
+    iptables -t nat -C POSTROUTING -o {{ wan_interface }} -j MASQUERADE || \
+    iptables -t nat -A POSTROUTING -o {{ wan_interface }} -j MASQUERADE
+  args:
+    warn: false
+
+- name: Save current NAT rules to /etc/iptables/ip_nat.rules
+  ansible.builtin.command: iptables-save -t nat
+  register: iptables_nat_save
+  changed_when: false
+
+- name: Write NAT rules file
+  ansible.builtin.copy:
+    content: "{{ iptables_nat_save.stdout }}\n"
+    dest: /etc/iptables/ip_nat.rules
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install iptables-restore systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/iptables-restore-lab.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Restore iptables NAT rules for lab
+      After=network.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/sbin/iptables-restore /etc/iptables/ip_nat.rules
+      RemainAfterExit=yes
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Enable and start iptables restore unit
+  ansible.builtin.systemd:
+    name: iptables-restore-lab.service
+    enabled: yes
+    state: started
+
+- name: Ensure dnsmasq is enabled and running
+  ansible.builtin.systemd:
+    name: dnsmasq
+    enabled: yes
+    state: started

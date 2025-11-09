@@ -1,0 +1,26 @@
+# roles/gestion_procesos_servicios/tasks/main.yml
+
+- name: 📌 Mostrar procesos activos
+  ansible.builtin.shell: "ps aux"
+  register: procesos
+  changed_when: false
+
+- name: 📄 Mostrar salida de procesos
+  ansible.builtin.debug:
+    var: procesos.stdout
+
+- name: ✅ Asegurar que los servicios esenciales están activos y habilitados
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop: "{{ servicios_esenciales }}"
+
+- name: 🔍 Mostrar servicios en ejecución
+  ansible.builtin.shell: "systemctl --type=service --state=running"
+  register: servicios
+  changed_when: false
+
+- name: 📄 Mostrar salida de los servicios
+  ansible.builtin.debug:
+    var: servicios.stdout

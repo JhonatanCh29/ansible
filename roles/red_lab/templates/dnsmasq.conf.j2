@@ -1,0 +1,19 @@
+# dnsmasq config for lab
+interface={{ lan_interface }}
+bind-interfaces
+no-hosts
+no-resolv
+domain-needed
+bogus-priv
+
+# DHCP range
+dhcp-range={{ lan_dhcp_start }},{{ lan_dhcp_end }},{{ dhcp_lease_time }}
+
+# Gateway and DNS options
+dhcp-option=3,{{ lan_gateway_ip }}
+dhcp-option=6,{{ dns_forwarders | join(",") }}
+
+# Upstream DNS servers for dnsmasq
+{% for server in dns_forwarders %}
+server={{ server }}
+{% endfor %}

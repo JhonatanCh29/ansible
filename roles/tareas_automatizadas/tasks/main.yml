@@ -1,0 +1,24 @@
+---
+# Automatización de tareas (cron)
+
+- name: Actualización automática del sistema diariamente
+  cron:
+    name: "Actualización diaria"
+    minute: "0"
+    hour: "2"
+    job: "apt update && apt upgrade -y"
+
+- name: Backup de logs cada noche
+  cron:
+    name: "Backup de logs"
+    minute: "30"
+    hour: "23"
+    job: "tar -czf /backups/logs_$(date +\\%F).tar.gz /var/log"
+
+- name: Limpiar archivos temporales cada semana
+  cron:
+    name: "Limpieza de /tmp"
+    weekday: "0"     # domingo
+    hour: "3"
+    minute: "0"
+    job: "rm -rf /tmp/*"

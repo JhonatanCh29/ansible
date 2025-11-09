@@ -1,0 +1,107 @@
+---
+# Playbook to configure VM network interfaces.
+# Can be run over SSH from the control node (cuando las VMs tengan IPs) o
+# ejecutado localmente en cada VM con `-c local` si configuras por consola.
+
+- name: Configure vm_jhonatan as LAN gateway (static LAN IP, WAN via DHCP)
+  hosts: vm_jhonatan
+  become: true
+  vars:
+    lan_interface: "ens192"     # Ajusta si tu VM tiene otro nombre de interfaz
+    wan_interface: "ens33"
+    lan_ip_cidr: "192.168.50.1/24"
+  tasks:
+    - name: Ensure NetworkManager is installed
+      ansible.builtin.package:
+        name: NetworkManager
+        state: present
+
+    - name: Ensure NetworkManager service is running
+      ansible.builtin.service:
+        name: NetworkManager
+        state: started
+        enabled: yes
+
+    - name: Configure LAN connection with static IP using nmcli
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet ifname {{ lan_interface }} con-name lab-lan ipv4.method manual ipv4.addresses {{ lan_ip_cidr }} connection.autoconnect yes
+      args:
+        warn: false
+      register: nmcli_lab_add
+      failed_when: nmcli_lab_add.rc not in [0,2]
+
+    - name: Bring up LAN connection
+      ansible.builtin.command: nmcli connection up lab-lan
+      args:
+        warn: false
+      failed_when: false
+
+    - name: Configure WAN connection to use DHCP (nmcli)
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet ifname {{ wan_interface }} con-name wan-dhcp ipv4.method auto connection.autoconnect yes
+      args:
+        warn: false
+      register: nmcli_wan_add
+      failed_when: nmcli_wan_add.rc not in [0,2]
+
+    - name: Bring up WAN connection
+      ansible.builtin.command: nmcli connection up wan-dhcp
+      args:
+        warn: false
+      failed_when: false
+
+    - name: Ensure SSH server is installed and running
+      ansible.builtin.package:
+        name: openssh-server
+        state: present
+
+    - name: Ensure sshd is enabled and running
+      ansible.builtin.service:
+        name: sshd
+        state: started
+        enabled: yes
+
+- name: Configure mint_jhonatan as DHCP client (use DHCP on LAN)
+  hosts: mint_jhonatan
+  become: true
+  vars:
+    lan_interface: "ens192"
+  tasks:
+    - name: Ensure NetworkManager is installed
+      ansible.builtin.package:
+        name: network-manager
+        state: present
+
+    - name: Ensure NetworkManager service is running
+      ansible.builtin.service:
+        name: NetworkManager
+        state: started
+        enabled: yes
+
+    - name: Create DHCP connection for LAN via nmcli
+      ansible.builtin.command: >-
+        nmcli connection add type ethernet ifname {{ lan_interface }} con-name lan-dhcp ipv4.method auto connection.autoconnect yes
+      args:
+        warn: false
+      register: nmcli_client_add
+      failed_when: nmcli_client_add.rc not in [0,2]
+
+    - name: Bring up LAN DHCP connection
+      ansible.builtin.command: nmcli connection up lan-dhcp
+      args:
+        warn: false
+      failed_when: false
+
+    - name: Ensure SSH server is installed and running
+      ansible.builtin.package:
+        name: openssh-server
+        state: present
+
+    - name: Ensure sshd is enabled and running
+      ansible.builtin.service:
+        name: ssh
+        state: started
+        enabled: yes
+
+# Nota: Este playbook utiliza nmcli. Si tu SO no tiene NetworkManager, necesitarás
+# adaptar las tareas (por ejemplo netplan en Ubuntu server o configuración de interfaces).

@@ -1,0 +1,5 @@
+- name: Configure lab network server (DHCP + NAT)
+  hosts: lab_academico
+  become: true
+  roles:
+    - red_lab

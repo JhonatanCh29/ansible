@@ -1,0 +1,104 @@
+---
+# 📌 Rol 1: Gestión de procesos y servicios
+
+# ✅ 1. Verificar si ciertos servicios están activos
+- name: Verificar estado de servicios esenciales
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - ssh
+    - cron
+    - systemd-logind
+  tags: servicios
+
+# ✅ 2. Crear carpeta de logs en el Escritorio de jhonatan
+- name: Crear carpeta de logs en el Escritorio de jhonatan
+  become: yes
+  ansible.builtin.file:
+    path: /home/jhonatan/Escritorio/logs
+    state: directory
+    owner: jhonatan
+    group: jhonatan
+    mode: '0755'
+
+# ✅ 3. Guardar servicios activos en archivo
+- name: Guardar servicios activos en escritorio
+  become: yes
+  become_user: jhonatan
+  shell: "systemctl --type=service --state=running > /home/jhonatan/Escritorio/logs/servicios_activos.txt"
+
+# ✅ 4. Guardar procesos que más consumen memoria
+- name: Guardar procesos de mayor uso de memoria
+  become: yes
+  become_user: jhonatan
+  shell: "ps aux --sort=-%mem | head -n 5 > /home/jhonatan/Escritorio/logs/procesos_memoria.txt"
+
+# ✅ 5. Guardar procesos que más consumen CPU
+- name: Guardar procesos de mayor uso de CPU
+  become: yes
+  become_user: jhonatan
+  shell: "ps aux --sort=-%cpu | head -n 5 > /home/jhonatan/Escritorio/logs/procesos_cpu.txt"
+
+# ✅ 6. Crear carpeta de logs en el Escritorio de jhonatan
+- name: Crear carpeta de logs en el Escritorio de jhonatan
+  become: yes
+  ansible.builtin.file:
+    path: /home/jhonatan/Escritorio/logs
+    state: directory
+    owner: jhonatan
+    group: jhonatan
+    mode: '0755'
+
+# ✅ 7. Guardar lista de servicios activos
+- name: Guardar servicios activos en archivo
+  become: yes
+  become_user: jhonatan
+  ansible.builtin.shell: "systemctl --type=service --state=running > /home/jhonatan/Escritorio/logs/servicios_activos.txt"
+
+# ✅ 8. Guardar procesos de mayor uso de memoria
+- name: Guardar procesos de mayor uso de memoria
+  become: yes
+  become_user: jhonatan
+  ansible.builtin.shell: "ps aux --sort=-%mem | head -n 5 > /home/jhonatan/Escritorio/logs/procesos_memoria.txt"
+
+# ✅ 9. Guardar procesos de mayor uso de CPU
+- name: Guardar procesos de mayor uso de CPU
+  become: yes
+  become_user: jhonatanS
+  ansible.builtin.shell: "ps aux --sort=-%cpu | head -n 5 > /home/jhonatan/Escritorio/logs/procesos_cpu.txt"
+
+# ✅ 10. Guardar la lista de servicios en la máquina remota
+- name: Generar archivo temporal de servicios activos
+  shell: "systemctl --type=service --state=running > /tmp/servicios_activos.txt"
+  become: yes
+
+# ✅ 11. Traer el archivo desde Linux Mint hacia tu laptop (WSL)
+- name: Copiar servicios activos al controlador (tu laptop)
+  fetch:
+    src: /tmp/servicios_activos.txt
+    dest: ./logs/
+    flat: yes
+
+# ✅ 12. Guardar procesos de memoria
+- name: Generar archivo temporal de procesos memoria
+  shell: "ps aux --sort=-%mem | head -n 5 > /tmp/procesos_memoria.txt"
+  become: yes
+
+- name: Copiar procesos memoria al controlador
+  fetch:
+    src: /tmp/procesos_memoria.txt
+    dest: ./logs/
+    flat: yes
+
+# ✅ 13. Guardar procesos de CPU
+- name: Generar archivo temporal de procesos CPU
+  shell: "ps aux --sort=-%cpu | head -n 5 > /tmp/procesos_cpu.txt"
+  become: yes
+
+- name: Copiar procesos CPU al controlador
+  fetch:
+    src: /tmp/procesos_cpu.txt
+    dest: ./logs/
+    flat: yes

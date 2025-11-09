@@ -1,0 +1,5 @@
+- name: 🛠️ Gestión de procesos y servicios en laboratorios
+  hosts: all   # O el grupo de tu inventario, como "laboratorio_1"
+  become: yes
+  roles:
+    - gestion_procesos_servicios
