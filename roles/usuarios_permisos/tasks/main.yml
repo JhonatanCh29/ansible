@@ -1,58 +1,170 @@
 ---
-# 📌 Rol 2: Administración de usuarios, permisos y políticas
+# 📌 Rol: Administración avanzada de usuarios, permisos y políticas
 
-# ✅ 1. Crear grupos necesarios
-- name: Crear grupos básicos
+# ✅ 1. Instalar herramientas de gestión de usuarios
+- name: Instalar herramientas de gestión de usuarios
+  become: yes
+  ansible.builtin.package:
+    name:
+      - sudo
+      - passwd
+      - libpam-pwquality
+      - acl
+    state: present
+
+# ✅ 2. Configurar políticas de contraseña
+- name: Configurar política de contraseñas seguras
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/common-password
+    regexp: '^password.*pam_pwquality.so'
+    line: 'password requisite pam_pwquality.so retry=3 minlen={{ password_policy.min_length | default(8) }} dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1'
+    backup: yes
+  when: password_policy is defined
+
+# ✅ 3. Configurar expiración de contraseñas
+- name: Configurar expiración de contraseñas
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: 'PASS_MAX_DAYS {{ password_policy.max_age_days | default(90) }}'
+    backup: yes
+  when: password_policy is defined
+
+# ✅ 4. Crear grupos del sistema
+- name: Crear grupos necesarios
+  become: yes
   ansible.builtin.group:
     name: "{{ item }}"
     state: present
-  loop:
-    - docentes
-    - soporte
-    - laboratorio
+  loop: "{{ user_groups | default(['docentes', 'soporte', 'laboratorio']) }}"
 
-# ✅ 2. Crear usuarios y asignarlos a grupos
-- name: Crear usuarios y asignarles grupo
+# ✅ 5. Crear usuarios con configuración avanzada
+- name: Crear usuarios del laboratorio
+  become: yes
   ansible.builtin.user:
     name: "{{ item.name }}"
     state: present
     groups: "{{ item.group }}"
     shell: /bin/bash
     create_home: yes
-  loop:
-    - { name: "adminlab", group: "laboratorio" }
-    - { name: "tecnico1", group: "soporte" }
-    - { name: "profesor1", group: "docentes" }
+    home: "{{ user_home_base | default('/home') }}/{{ item.name }}"
+    password: "{{ lookup('vars', 'vault_password_' + item.name, default='*') }}"
+  loop: "{{ lab_users | default([]) }}"
+  no_log: true  # No mostrar contraseñas en logs
 
-# ✅ 3. Establecer contraseña a los usuarios (opcional)
-# ⚠ La contraseña debe estar en formato encriptado SHA512
-- name: Colocar contraseñas a usuarios
-  ansible.builtin.user:
-    name: "{{ item.name }}"
-    password: "{{ item.pass }}"
-  loop:
-    - { name: "adminlab",  pass: "{{ 'admin123' | password_hash('sha512') }}" }
-    - { name: "tecnico1",  pass: "{{ 'tecnico123' | password_hash('sha512') }}" }
-    - { name: "profesor1", pass: "{{ 'prof123' | password_hash('sha512') }}" }
-
-# ✅ 4. Habilitar sudo sin contraseña a un usuario específico
-- name: Permitir sudo sin contraseña a adminlab
+# ✅ 6. Configurar sudo para usuarios autorizados
+- name: Configurar sudo sin contraseña para usuarios específicos
+  become: yes
   ansible.builtin.copy:
-    dest: /etc/sudoers.d/adminlab
-    content: "adminlab ALL=(ALL) NOPASSWD:ALL"
+    dest: "/etc/sudoers.d/{{ item }}"
+    content: "{{ item }} ALL=(ALL) NOPASSWD:ALL"
     owner: root
     group: root
     mode: '0440'
+    validate: 'visudo -cf %s'
+  loop: "{{ sudo_nopasswd_users | default(['adminlab']) }}"
 
-# ✅ 5. Asegurar permisos correctos en /home
-- name: Asignar dueño correcto a los home de cada usuario
+# ✅ 7. Configurar sudo limitado para otros usuarios
+- name: Configurar sudo limitado para usuarios técnicos
+  become: yes
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/technical_users
+    content: |
+      # Permitir a usuarios técnicos comandos específicos
+      %soporte ALL=(ALL) NOPASSWD: /bin/systemctl restart *, /bin/systemctl stop *, /bin/systemctl start *
+      %soporte ALL=(ALL) NOPASSWD: /usr/bin/tail /var/log/*, /usr/bin/less /var/log/*
+      %docentes ALL=(ALL) NOPASSWD: /bin/ps *, /usr/bin/top, /usr/bin/htop
+    owner: root
+    group: root
+    mode: '0440'
+    validate: 'visudo -cf %s'
+
+# ✅ 8. Configurar permisos correctos en directorios home
+- name: Asegurar permisos correctos en directorios home
+  become: yes
   ansible.builtin.file:
-    path: "/home/{{ item }}"
-    owner: "{{ item }}"
-    group: "{{ item }}"
+    path: "{{ user_home_base | default('/home') }}/{{ item.name }}"
+    owner: "{{ item.name }}"
+    group: "{{ item.group }}"
+    mode: '0750'
     state: directory
-    recurse: yes
-  loop:
-    - adminlab
-    - tecnico1
-    - profesor1
+    recurse: no  # Solo el directorio principal, no todo el contenido
+  loop: "{{ lab_users | default([]) }}"
+
+# ✅ 9. Crear directorio de logs para auditoría de usuarios
+- name: Crear directorio de auditoría
+  become: yes
+  ansible.builtin.file:
+    path: /var/log/user_audit
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+
+# ✅ 10. Configurar logging de comandos sudo
+- name: Configurar logging de comandos sudo
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    line: 'Defaults logfile="/var/log/user_audit/sudo.log"'
+    validate: 'visudo -cf %s'
+    backup: yes
+
+# ✅ 11. Crear script de auditoría de usuarios
+- name: Crear script de auditoría de usuarios
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/user_audit.sh
+    content: |
+      #!/bin/bash
+      # Script de auditoría de usuarios
+      
+      AUDIT_LOG="/var/log/user_audit/user_report.log"
+      echo "=== Auditoría de Usuarios $(date) ===" > "$AUDIT_LOG"
+      
+      # Usuarios conectados
+      echo "--- Usuarios Conectados ---" >> "$AUDIT_LOG"
+      who >> "$AUDIT_LOG"
+      
+      # Últimos logins
+      echo "--- Últimos Logins ---" >> "$AUDIT_LOG"
+      last -n 20 >> "$AUDIT_LOG"
+      
+      # Usuarios con sudo
+      echo "--- Usuarios con Privilegios Sudo ---" >> "$AUDIT_LOG"
+      grep -r "^[^#].*ALL=" /etc/sudoers.d/ /etc/sudoers 2>/dev/null >> "$AUDIT_LOG"
+      
+      # Verificar integridad de archivos críticos
+      echo "--- Verificación de Archivos Críticos ---" >> "$AUDIT_LOG"
+      ls -la /etc/passwd /etc/shadow /etc/group /etc/sudoers >> "$AUDIT_LOG"
+      
+      echo "=== Fin de Auditoría ===" >> "$AUDIT_LOG"
+    owner: root
+    group: root
+    mode: '0755'
+
+# ✅ 12. Programar auditoría diaria
+- name: Programar auditoría diaria de usuarios
+  become: yes
+  ansible.builtin.cron:
+    name: "Auditoría diaria de usuarios"
+    minute: "0"
+    hour: "7"
+    job: "/usr/local/bin/user_audit.sh"
+    user: root
+
+# ✅ 13. Verificar usuarios existentes y mostrar estado
+- name: Verificar usuarios creados
+  become: yes
+  ansible.builtin.command: "getent passwd {{ item.name }}"
+  register: user_check
+  loop: "{{ lab_users | default([]) }}"
+  failed_when: false
+  changed_when: false
+
+- name: Mostrar estado de usuarios
+  ansible.builtin.debug:
+    msg: "Usuario {{ item.item.name }}: {{ 'EXISTE' if item.rc == 0 else 'NO EXISTE' }}"
+  loop: "{{ user_check.results }}"

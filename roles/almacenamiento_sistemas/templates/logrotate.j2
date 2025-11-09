@@ -1,0 +1,22 @@
+# Configuración de rotación de logs para el laboratorio
+# Generado automáticamente por Ansible
+
+{% for policy in log_policies %}
+{{ policy.path }} {
+    rotate {{ policy.rotate | default(5) }}
+    size {{ policy.size | default('100M') }}
+    {% if policy.compress | default(true) %}
+    compress
+    {% endif %}
+    {% if policy.delaycompress | default(true) %}
+    delaycompress
+    {% endif %}
+    missingok
+    notifempty
+    create 644 root root
+    postrotate
+        /bin/systemctl reload rsyslog > /dev/null 2>&1 || true
+    endscript
+}
+
+{% endfor %}

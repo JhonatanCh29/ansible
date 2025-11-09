@@ -1,0 +1,169 @@
+---
+# Playbook de verificación y monitoreo del laboratorio
+# Este playbook valida que todos los componentes críticos estén funcionando
+
+- name: 🔍 Verificación completa del laboratorio
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars:
+    critical_services:
+      - ssh
+      - cron
+      - systemd-logind
+    network_services:
+      - dnsmasq
+    disk_usage_threshold: 85
+    memory_usage_threshold: 85
+
+  tasks:
+    # ===== VERIFICACIONES DE SISTEMA =====
+    - name: ✅ Verificar servicios críticos
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+      register: service_status
+      loop: "{{ critical_services }}"
+      failed_when: service_status.status.ActiveState != 'active'
+      
+    - name: 📊 Verificar uso de disco
+      ansible.builtin.shell: "df / | awk 'NR==2 {print $5}' | sed 's/%//'"
+      register: disk_usage
+      changed_when: false
+      
+    - name: ⚠️ Alertar si uso de disco es alto
+      ansible.builtin.fail:
+        msg: "CRÍTICO: Uso de disco en / es {{ disk_usage.stdout }}% (umbral: {{ disk_usage_threshold }}%)"
+      when: disk_usage.stdout | int > disk_usage_threshold
+      
+    - name: 🧠 Verificar uso de memoria
+      ansible.builtin.shell: "free | awk 'NR==2{printf \"%.0f\", $3*100/$2 }'"
+      register: memory_usage
+      changed_when: false
+      
+    - name: ⚠️ Alertar si uso de memoria es alto
+      ansible.builtin.debug:
+        msg: "ADVERTENCIA: Uso de memoria es {{ memory_usage.stdout }}% (umbral: {{ memory_usage_threshold }}%)"
+      when: memory_usage.stdout | int > memory_usage_threshold
+
+    # ===== VERIFICACIONES DE RED (solo en vm_jhonatan) =====
+    - name: 🌐 Verificar servicios de red
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+      register: network_service_status
+      loop: "{{ network_services }}"
+      failed_when: network_service_status.status.ActiveState != 'active'
+      when: inventory_hostname == 'vm_jhonatan'
+      
+    - name: 🔌 Verificar conectividad a internet
+      ansible.builtin.uri:
+        url: "http://8.8.8.8:53"
+        method: GET
+        timeout: 5
+      register: internet_check
+      failed_when: false
+      when: inventory_hostname == 'vm_jhonatan'
+      
+    - name: 📡 Verificar DHCP está funcionando
+      ansible.builtin.shell: "ps aux | grep dnsmasq | grep -v grep"
+      register: dhcp_check
+      changed_when: false
+      when: inventory_hostname == 'vm_jhonatan'
+
+    # ===== VERIFICACIONES DE SEGURIDAD =====
+    - name: 🔐 Verificar configuración de sudo
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/adminlab
+      register: sudo_config
+      
+    - name: 👥 Verificar usuarios del laboratorio existen
+      ansible.builtin.command: "id {{ item }}"
+      register: user_check
+      failed_when: user_check.rc != 0
+      changed_when: false
+      loop:
+        - adminlab
+        - tecnico1
+        - profesor1
+      ignore_errors: yes
+
+    # ===== VERIFICACIONES DE ALMACENAMIENTO =====
+    - name: 💾 Verificar scripts de backup existen
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: backup_scripts
+      loop:
+        - /usr/local/bin/backup_lab.sh
+        - /usr/local/bin/disk_monitor.sh
+      ignore_errors: yes
+      
+    - name: 📝 Verificar configuración de logrotate
+      ansible.builtin.stat:
+        path: /etc/logrotate.d/lab-logs
+      register: logrotate_config
+      ignore_errors: yes
+
+    # ===== VERIFICACIONES DE AUTOMATIZACIÓN =====
+    - name: ⏰ Verificar tareas cron están configuradas
+      ansible.builtin.shell: "crontab -l | wc -l"
+      register: cron_count
+      changed_when: false
+      become_user: root
+      
+    - name: 🔧 Verificar scripts de monitoreo existen
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: monitor_scripts
+      loop:
+        - /usr/local/bin/check_services.sh
+        - /usr/local/bin/daily_validation.sh
+        - /usr/local/bin/user_audit.sh
+      ignore_errors: yes
+
+    # ===== REPORTE FINAL =====
+    - name: 📋 Generar reporte de verificación
+      ansible.builtin.copy:
+        dest: "/var/log/lab_verification_{{ ansible_date_time.date }}.log"
+        content: |
+          === REPORTE DE VERIFICACIÓN DEL LABORATORIO ===
+          Fecha: {{ ansible_date_time.date }} {{ ansible_date_time.time }}
+          Host: {{ inventory_hostname }}
+          
+          === SERVICIOS CRÍTICOS ===
+          {% for service in critical_services %}
+          - {{ service }}: {{ 'OK' if service_status.results[loop.index0].status.ActiveState == 'active' else 'ERROR' }}
+          {% endfor %}
+          
+          === RECURSOS DEL SISTEMA ===
+          - Uso de disco: {{ disk_usage.stdout }}%
+          - Uso de memoria: {{ memory_usage.stdout }}%
+          - Uptime: {{ ansible_uptime_seconds // 3600 }} horas
+          
+          === SEGURIDAD ===
+          - Configuración sudo: {{ 'OK' if sudo_config.stat.exists else 'FALTA' }}
+          - Usuarios laboratorio: {{ user_check.results | selectattr('rc', 'equalto', 0) | list | length }}/3 creados
+          
+          === ALMACENAMIENTO ===
+          - Scripts backup: {{ backup_scripts.results | selectattr('stat.exists', 'defined') | selectattr('stat.exists') | list | length }}/{{ backup_scripts.results | length }}
+          - Logrotate: {{ 'OK' if logrotate_config.stat.exists else 'NO CONFIGURADO' }}
+          
+          === AUTOMATIZACIÓN ===
+          - Tareas cron: {{ cron_count.stdout }}
+          - Scripts monitoreo: {{ monitor_scripts.results | selectattr('stat.exists', 'defined') | selectattr('stat.exists') | list | length }}/{{ monitor_scripts.results | length }}
+          
+          {% if inventory_hostname == 'vm_jhonatan' %}
+          === RED (Servidor) ===
+          - DNSMASQ: {{ 'OK' if dhcp_check.stdout else 'ERROR' }}
+          - Conectividad Internet: {{ 'OK' if internet_check.status == 200 else 'ERROR' }}
+          {% endif %}
+          
+          === FIN DEL REPORTE ===
+      
+    - name: ✅ Mostrar resumen de verificación
+      ansible.builtin.debug:
+        msg: |
+          🎯 VERIFICACIÓN COMPLETADA PARA {{ inventory_hostname }}
+          📊 Servicios críticos: {{ critical_services | length }}/{{ critical_services | length }}
+          💾 Uso de disco: {{ disk_usage.stdout }}%
+          🧠 Uso de memoria: {{ memory_usage.stdout }}%
+          📋 Reporte guardado en: /var/log/lab_verification_{{ ansible_date_time.date }}.log

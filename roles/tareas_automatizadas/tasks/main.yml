@@ -1,24 +1,187 @@
 ---
-# Automatización de tareas (cron)
+# 📌 Rol: Automatización de tareas avanzada
 
-- name: Actualización automática del sistema diariamente
-  cron:
-    name: "Actualización diaria"
+# ✅ 1. Instalar herramientas necesarias para automatización
+- name: Instalar herramientas de automatización
+  become: yes
+  ansible.builtin.package:
+    name:
+      - cron
+      - logrotate
+      - rsync
+      - mailutils
+    state: present
+
+# ✅ 2. Configurar actualización automática del sistema
+- name: Configurar actualización automática
+  become: yes
+  ansible.builtin.cron:
+    name: "{{ item.name }}"
+    minute: "{{ item.minute }}"
+    hour: "{{ item.hour }}"
+    weekday: "{{ item.weekday | default('*') }}"
+    job: "{{ item.job }}"
+    user: "{{ automation_user | default('root') }}"
+  loop:
+    - name: "Actualización automática del sistema"
+      minute: "{{ auto_update_schedule.minute | default('0') }}"
+      hour: "{{ auto_update_schedule.hour | default('2') }}"
+      weekday: "{{ auto_update_schedule.weekday | default('0') }}"
+      job: "apt update && apt upgrade -y >> /var/log/auto-update.log 2>&1"
+  when: auto_update_enabled | default(false)
+
+# ✅ 3. Configurar backup automático avanzado
+- name: Crear directorio de backup
+  become: yes
+  ansible.builtin.file:
+    path: "{{ backup_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  when: backup_enabled | default(false)
+
+- name: Configurar backup automático con rotación
+  become: yes
+  ansible.builtin.cron:
+    name: "Backup automático con rotación"
+    minute: "{{ backup_schedule.minute | default('0') }}"
+    hour: "{{ backup_schedule.hour | default('2') }}"
+    job: >-
+      tar -czf {{ backup_directory }}/logs_$(date +\%F).tar.gz /var/log &&
+      find {{ backup_directory }} -name "logs_*.tar.gz" -mtime +{{ backup_retention_days | default(7) }} -delete
+    user: "{{ automation_user | default('root') }}"
+  when: backup_enabled | default(false)
+
+# ✅ 4. Configurar limpieza automática avanzada
+- name: Configurar limpieza de archivos temporales
+  become: yes
+  ansible.builtin.cron:
+    name: "Limpieza automática - {{ item }}"
+    minute: "{{ cleanup_schedule.minute | default('0') }}"
+    hour: "{{ cleanup_schedule.hour | default('3') }}"
+    weekday: "{{ cleanup_schedule.weekday | default('0') }}"
+    job: "find {{ item }} -type f -atime +1 -delete 2>/dev/null || true"
+    user: "{{ automation_user | default('root') }}"
+  loop: "{{ cleanup_paths }}"
+  when: cleanup_enabled | default(false)
+
+# ✅ 5. Configurar rotación avanzada de logs
+- name: Configurar rotación de logs del sistema
+  become: yes
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/lab-system
+    content: |
+      /var/log/*.log {
+          rotate {{ log_rotate_count | default(5) }}
+          size {{ log_max_size | default('100M') }}
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 644 root root
+      }
+    owner: root
+    group: root
+    mode: '0644'
+  when: log_rotation_enabled | default(false)
+
+# ✅ 6. Crear script de monitoreo de servicios críticos
+- name: Crear script de monitoreo de servicios
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/check_services.sh
+    content: |
+      #!/bin/bash
+      # Script de monitoreo de servicios críticos
+      
+      SERVICES=(ssh cron systemd-logind)
+      ALERT_LOG="/var/log/service_alerts.log"
+      
+      for service in "${SERVICES[@]}"; do
+          if ! systemctl is-active --quiet "$service"; then
+              echo "[$(date)] ALERT: Servicio $service no está activo" >> "$ALERT_LOG"
+              logger "ALERT: Servicio $service no está activo"
+              # Intentar reiniciar el servicio
+              systemctl restart "$service"
+              if systemctl is-active --quiet "$service"; then
+                  echo "[$(date)] INFO: Servicio $service reiniciado exitosamente" >> "$ALERT_LOG"
+              fi
+          fi
+      done
+    owner: root
+    group: root
+    mode: '0755'
+
+# ✅ 7. Programar monitoreo de servicios cada 5 minutos
+- name: Programar monitoreo de servicios críticos
+  become: yes
+  ansible.builtin.cron:
+    name: "Monitoreo de servicios críticos"
+    minute: "*/5"
+    job: "/usr/local/bin/check_services.sh"
+    user: root
+
+# ✅ 8. Configurar alertas por email si está habilitado
+- name: Configurar alertas por email
+  become: yes
+  ansible.builtin.cron:
+    name: "Resumen diario de alertas"
     minute: "0"
-    hour: "2"
-    job: "apt update && apt upgrade -y"
+    hour: "8"
+    job: >-
+      if [ -f /var/log/service_alerts.log ]; then
+        cat /var/log/service_alerts.log | mail -s "Resumen de alertas - $(hostname)" {{ admin_email }};
+        > /var/log/service_alerts.log;
+      fi
+    user: root
+  when: 
+    - email_alerts_enabled | default(false)
+    - admin_email is defined
 
-- name: Backup de logs cada noche
-  cron:
-    name: "Backup de logs"
+# ✅ 9. Crear tarea de validación diaria del sistema
+- name: Crear script de validación diaria
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/daily_validation.sh
+    content: |
+      #!/bin/bash
+      # Validación diaria del sistema
+      
+      REPORT="/var/log/daily_report.log"
+      echo "=== Reporte Diario del Sistema $(date) ===" > "$REPORT"
+      
+      # Estado de servicios
+      echo "--- Servicios ---" >> "$REPORT"
+      systemctl --failed --no-legend >> "$REPORT"
+      
+      # Uso de disco
+      echo "--- Uso de Disco ---" >> "$REPORT"
+      df -h >> "$REPORT"
+      
+      # Carga del sistema
+      echo "--- Carga del Sistema ---" >> "$REPORT"
+      uptime >> "$REPORT"
+      
+      # Top procesos por CPU
+      echo "--- Top Procesos CPU ---" >> "$REPORT"
+      ps aux --sort=-%cpu | head -10 >> "$REPORT"
+      
+      # Top procesos por memoria
+      echo "--- Top Procesos Memoria ---" >> "$REPORT"
+      ps aux --sort=-%mem | head -10 >> "$REPORT"
+      
+      echo "=== Fin del Reporte ===" >> "$REPORT"
+    owner: root
+    group: root
+    mode: '0755'
+
+# ✅ 10. Programar validación diaria
+- name: Programar validación diaria del sistema
+  become: yes
+  ansible.builtin.cron:
+    name: "Validación diaria del sistema"
     minute: "30"
-    hour: "23"
-    job: "tar -czf /backups/logs_$(date +\\%F).tar.gz /var/log"
-
-- name: Limpiar archivos temporales cada semana
-  cron:
-    name: "Limpieza de /tmp"
-    weekday: "0"     # domingo
-    hour: "3"
-    minute: "0"
-    job: "rm -rf /tmp/*"
+    hour: "6"
+    job: "/usr/local/bin/daily_validation.sh"
+    user: root

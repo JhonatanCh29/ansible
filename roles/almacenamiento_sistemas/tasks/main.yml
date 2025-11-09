@@ -1,26 +1,129 @@
-# roles/gestion_procesos_servicios/tasks/main.yml
+---
+# 📌 Rol: Administración de almacenamiento
 
-- name: 📌 Mostrar procesos activos
-  ansible.builtin.shell: "ps aux"
-  register: procesos
+# ✅ 1. Instalar herramientas de gestión de almacenamiento
+- name: Instalar herramientas de almacenamiento
+  become: yes
+  ansible.builtin.package:
+    name:
+      - lvm2
+      - parted
+      - e2fsprogs
+      - xfsprogs
+      - logrotate
+    state: present
+
+# ✅ 2. Verificar y crear grupo de volúmenes LVM si está habilitado
+- name: Verificar si existe el grupo de volúmenes
+  become: yes
+  ansible.builtin.command: "vgs {{ volume_group_name }}"
+  register: vg_check
+  failed_when: false
+  changed_when: false
+  when: lvm_enabled | default(false)
+
+- name: Mostrar información del grupo de volúmenes (si existe)
+  ansible.builtin.debug:
+    msg: "Grupo de volúmenes {{ volume_group_name }} encontrado"
+  when: 
+    - lvm_enabled | default(false)
+    - vg_check.rc == 0
+
+# ✅ 3. Crear directorios de montaje para volúmenes lógicos
+- name: Crear directorios de montaje
+  become: yes
+  ansible.builtin.file:
+    path: "{{ item.mount_point }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ logical_volumes }}"
+  when: lvm_enabled | default(false)
+
+# ✅ 4. Configurar rotación de logs
+- name: Configurar rotación de logs
+  become: yes
+  ansible.builtin.template:
+    src: logrotate.j2
+    dest: "/etc/logrotate.d/lab-logs"
+    owner: root
+    group: root
+    mode: '0644'
+  when: log_rotation_enabled | default(false)
+
+# ✅ 5. Crear script de monitoreo de espacio en disco
+- name: Crear script de monitoreo de disco
+  become: yes
+  ansible.builtin.template:
+    src: disk_monitor.sh.j2
+    dest: "/usr/local/bin/disk_monitor.sh"
+    owner: root
+    group: root
+    mode: '0755'
+  when: disk_monitoring_enabled | default(false)
+
+# ✅ 6. Configurar cron para monitoreo de disco
+- name: Configurar monitoreo automático de disco
+  become: yes
+  ansible.builtin.cron:
+    name: "Monitoreo de espacio en disco"
+    minute: "{{ disk_check_interval | default('*/15') }}"
+    job: "/usr/local/bin/disk_monitor.sh"
+    user: root
+  when: disk_monitoring_enabled | default(false)
+
+# ✅ 7. Crear directorio de backups
+- name: Crear directorio de backups
+  become: yes
+  ansible.builtin.file:
+    path: "{{ backup_destination }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0750'
+  when: backup_enabled | default(false)
+
+# ✅ 8. Configurar script de backup automático
+- name: Crear script de backup
+  become: yes
+  ansible.builtin.template:
+    src: backup_script.sh.j2
+    dest: "/usr/local/bin/backup_lab.sh"
+    owner: root
+    group: root
+    mode: '0755'
+  when: backup_enabled | default(false)
+
+# ✅ 9. Programar backup automático
+- name: Programar backup automático
+  become: yes
+  ansible.builtin.cron:
+    name: "Backup automático del laboratorio"
+    minute: "{{ backup_schedule.minute | default('30') }}"
+    hour: "{{ backup_schedule.hour | default('1') }}"
+    job: "/usr/local/bin/backup_lab.sh"
+    user: root
+  when: backup_enabled | default(false)
+
+# ✅ 10. Configurar limpieza automática de archivos antiguos
+- name: Programar limpieza automática
+  become: yes
+  ansible.builtin.cron:
+    name: "Limpieza de archivos antiguos - {{ item.path }}"
+    minute: "0"
+    hour: "3"
+    weekday: "0"
+    job: "find {{ item.path }} -type f -mtime +{{ item.age_days | default(7) }} -delete"
+    user: root
+  loop: "{{ cleanup_targets }}"
+  when: auto_cleanup_enabled | default(false)
+
+# ✅ 11. Verificar uso actual de disco
+- name: Verificar uso actual de disco
+  become: yes
+  ansible.builtin.command: "df -h"
+  register: disk_usage
   changed_when: false
 
-- name: 📄 Mostrar salida de procesos
+- name: Mostrar uso actual de disco
   ansible.builtin.debug:
-    var: procesos.stdout
-
-- name: ✅ Asegurar que los servicios esenciales están activos y habilitados
-  ansible.builtin.systemd:
-    name: "{{ item }}"
-    state: started
-    enabled: yes
-  loop: "{{ servicios_esenciales }}"
-
-- name: 🔍 Mostrar servicios en ejecución
-  ansible.builtin.shell: "systemctl --type=service --state=running"
-  register: servicios
-  changed_when: false
-
-- name: 📄 Mostrar salida de los servicios
-  ansible.builtin.debug:
-    var: servicios.stdout
+    var: disk_usage.stdout_lines

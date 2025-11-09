@@ -12,5 +12,25 @@ dns_forwarders:
   - "8.8.8.8"
   - "8.8.4.4"
 
-# Directorio remoto para guardar logs (opcional). Si no aplica, dejar en cadena vacía.
-logs_dir: "/home/jhonatan/Escritorio/logs"
+# Variables para Nivel 4 - Administración avanzada
+# Directorio para logs del laboratorio (parametrizable)
+logs_dir: "/var/log/lab"
+
+# Usuario administrador principal
+admin_user: "jhonatan"
+
+# Configuración de monitoreo y alertas
+monitoring_enabled: true
+disk_usage_threshold: 85
+memory_usage_threshold: 85
+
+# Configuración de backups
+backup_enabled: true
+backup_retention_days: 30
+
+# Configuración de automatización
+auto_update_enabled: true
+log_rotation_enabled: true
+
+# Email para alertas (opcional - configurar si se desea)
+# admin_email: "admin@lab.local"

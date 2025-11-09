@@ -1,0 +1,37 @@
+---
+# Variables por defecto para el rol usuarios_permisos
+
+# Usuario administrador principal
+admin_user: "jhonatan"
+admin_group: "sudo"
+
+# Grupos a crear en el sistema
+user_groups:
+  - docentes
+  - soporte
+  - laboratorio
+
+# Usuarios a crear (sin contraseñas en texto plano - usar vault)
+lab_users:
+  - name: "adminlab"
+    group: "laboratorio"
+    sudo: true
+  - name: "tecnico1"
+    group: "soporte"
+    sudo: false
+  - name: "profesor1"
+    group: "docentes"
+    sudo: false
+
+# Políticas de contraseña
+password_policy:
+  min_length: 8
+  require_special_chars: true
+  max_age_days: 90
+
+# Configuración de sudo
+sudo_nopasswd_users:
+  - "adminlab"
+
+# Directorio base para usuarios
+user_home_base: "/home"

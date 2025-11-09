@@ -1,0 +1,39 @@
+---
+# Variables por defecto para el rol tareas_automatizadas
+
+# Configuración de backups automáticos
+backup_enabled: true
+backup_schedule:
+  hour: "2"
+  minute: "0"
+backup_retention_days: 7
+backup_directory: "/var/backups"
+
+# Configuración de actualizaciones automáticas
+auto_update_enabled: true
+auto_update_schedule:
+  hour: "2"
+  minute: "0"
+  weekday: "0"  # Domingo
+
+# Configuración de limpieza de archivos temporales
+cleanup_enabled: true
+cleanup_schedule:
+  hour: "3"
+  minute: "0"
+  weekday: "0"  # Domingo
+cleanup_paths:
+  - "/tmp"
+  - "/var/tmp"
+
+# Configuración de monitoreo de logs
+log_rotation_enabled: true
+log_max_size: "100M"
+log_rotate_count: 5
+
+# Configuración de alertas por email (opcional)
+email_alerts_enabled: false
+admin_email: "admin@lab.local"
+
+# Usuario que ejecutará las tareas automatizadas
+automation_user: "root"

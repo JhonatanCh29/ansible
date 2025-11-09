@@ -1,0 +1,59 @@
+---
+# Variables por defecto para el rol almacenamiento_sistemas
+
+# Configuración de particiones y LVM
+lvm_enabled: true
+volume_group_name: "lab-vg"
+logical_volumes:
+  - name: "logs-lv"
+    size: "2G"
+    mount_point: "/var/log"
+    filesystem: "ext4"
+  - name: "backups-lv"
+    size: "5G"
+    mount_point: "/var/backups"
+    filesystem: "ext4"
+
+# Configuración de monitoreo de disco
+disk_monitoring_enabled: true
+disk_usage_threshold: 85  # Porcentaje
+disk_check_interval: "*/15"  # minutos
+
+# Configuración de rotación de logs
+log_rotation_enabled: true
+log_policies:
+  - path: "/var/log/*.log"
+    rotate: 5
+    size: "100M"
+    compress: true
+    delaycompress: true
+
+# Configuración de backups
+backup_enabled: true
+backup_schedule:
+  hour: "1"
+  minute: "30"
+backup_paths:
+  - "/etc"
+  - "/home"
+  - "/var/log"
+backup_destination: "/var/backups"
+backup_retention_days: 30
+
+# Configuración de limpieza automática
+auto_cleanup_enabled: true
+cleanup_targets:
+  - path: "/tmp"
+    age_days: 7
+  - path: "/var/log"
+    pattern: "*.log.*.gz"
+    age_days: 30
+
+# Sistema de archivos por defecto para nuevos volúmenes
+default_filesystem: "ext4"
+
+# Configuración de alertas de espacio
+space_alerts_enabled: true
+alert_thresholds:
+  warning: 80
+  critical: 90

@@ -1,0 +1,48 @@
+#!/bin/bash
+# Script de monitoreo de espacio en disco
+# Generado automáticamente por Ansible
+
+THRESHOLD={{ disk_usage_threshold | default(85) }}
+{% if space_alerts_enabled | default(true) %}
+WARNING_THRESHOLD={{ alert_thresholds.warning | default(80) }}
+CRITICAL_THRESHOLD={{ alert_thresholds.critical | default(90) }}
+{% endif %}
+
+# Función para enviar alerta
+send_alert() {
+    local level="$1"
+    local message="$2"
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    
+    # Log al sistema
+    logger -t disk_monitor "[$level] $message"
+    
+    # Escribir a archivo de alertas
+    echo "[$timestamp] [$level] $message" >> /var/log/disk_alerts.log
+    
+    {% if email_alerts_enabled | default(false) and admin_email is defined %}
+    # Enviar email si está configurado
+    echo "$message" | mail -s "Alerta de Disco [$level] - $(hostname)" {{ admin_email }}
+    {% endif %}
+}
+
+# Verificar uso de disco en todas las particiones
+df -h | grep -E '^/dev/' | while read filesystem size used available percent mountpoint; do
+    # Extraer el porcentaje sin el símbolo %
+    usage=$(echo $percent | sed 's/%//')
+    
+    {% if space_alerts_enabled | default(true) %}
+    if [ "$usage" -ge "$CRITICAL_THRESHOLD" ]; then
+        send_alert "CRITICAL" "Partición $mountpoint está al $percent de capacidad (crítico: >=${CRITICAL_THRESHOLD}%)"
+    elif [ "$usage" -ge "$WARNING_THRESHOLD" ]; then
+        send_alert "WARNING" "Partición $mountpoint está al $percent de capacidad (advertencia: >=${WARNING_THRESHOLD}%)"
+    fi
+    {% else %}
+    if [ "$usage" -ge "$THRESHOLD" ]; then
+        send_alert "ALERT" "Partición $mountpoint está al $percent de capacidad (umbral: ${THRESHOLD}%)"
+    fi
+    {% endif %}
+done
+
+# Limpiar logs de alertas antiguos (mantener últimos 30 días)
+find /var/log/disk_alerts.log -mtime +30 -delete 2>/dev/null || true

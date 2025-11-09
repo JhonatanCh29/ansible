@@ -1,0 +1,22 @@
+---
+# Variables por defecto para el rol procesos_servicios
+
+# Directorio donde guardar logs (se puede sobrescribir en group_vars)
+logs_dir: "/var/log/lab"
+
+# Usuario administrador del sistema (para operaciones que requieren un usuario específico)
+admin_user: "jhonatan"
+
+# Servicios esenciales que deben estar activos
+servicios_esenciales:
+  - ssh
+  - cron
+  - systemd-logind
+
+# Configuración de logs
+logs_cleanup_enabled: true
+logs_max_age_days: 30
+
+# Configuración de monitoreo de procesos
+monitor_cpu_threshold: 80
+monitor_memory_threshold: 85
