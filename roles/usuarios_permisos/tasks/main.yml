@@ -1,16 +1,31 @@
 ---
 # 📌 Rol: Administración avanzada de usuarios, permisos y políticas
 
-# ✅ 1. Instalar herramientas de gestión de usuarios
-- name: Instalar herramientas de gestión de usuarios
+# ✅ 1. Instalar herramientas de gestión de usuarios (Fedora/CentOS)
+- name: Instalar herramientas de gestión de usuarios en Fedora/CentOS
   become: yes
   ansible.builtin.package:
     name:
       - sudo
       - passwd
-      - libpam-pwquality
-      - acl
+      - libpwquality  # En Fedora se llama libpwquality
+      - shadow-utils
     state: present
+  when: ansible_facts['os_family'] == "RedHat"
+  ignore_errors: yes
+
+# ✅ 1b. Instalar herramientas de gestión de usuarios (Ubuntu/Mint)
+- name: Instalar herramientas de gestión de usuarios en Ubuntu/Mint
+  become: yes
+  ansible.builtin.package:
+    name:
+      - sudo
+      - passwd
+      - libpam-pwquality  # En Ubuntu se llama libpam-pwquality
+      - shadow-utils
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  ignore_errors: yes
 
 # ✅ 2. Configurar políticas de contraseña
 - name: Configurar política de contraseñas seguras
