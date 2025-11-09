@@ -28,14 +28,18 @@
   ignore_errors: yes
 
 # ✅ 2. Configurar políticas de contraseña
-- name: Configurar política de contraseñas seguras
+- name: Configurar política de contraseñas seguras (solo Ubuntu/Mint)
   become: yes
   ansible.builtin.lineinfile:
     path: /etc/pam.d/common-password
     regexp: '^password.*pam_pwquality.so'
     line: 'password requisite pam_pwquality.so retry=3 minlen={{ password_policy.min_length | default(8) }} dcredit=-1 ucredit=-1 ocredit=-1 lcredit=-1'
     backup: yes
-  when: password_policy is defined
+    create: yes
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - password_policy is defined
+  ignore_errors: yes
 
 # ✅ 3. Configurar expiración de contraseñas
 - name: Configurar expiración de contraseñas
