@@ -1,8 +1,9 @@
 ---
-# Playbook para configurar red inicial en mint_jhonatan
-# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_mint_jhonatan.yml --become-method=sudo -K
+# Playbook MEJORADO para configurar red en mint_jhonatan
+# Versión corregida que maneja mejor las conexiones
+# Ejecutar con: ansible-playbook -c local -i localhost, playbooks/configurar_red_mint_jhonatan_v2.yml --become-method=sudo -K
 
-- name: 💻 Configuración de red - mint_jhonatan
+- name: 💻 Configuración de red MEJORADA - mint_jhonatan
   hosts: localhost
   become: yes
   connection: local
@@ -11,54 +12,148 @@
   vars:
     ansible_python_interpreter: /usr/bin/python3
     lan_interface: "ens34"
+    connection_name: "lab-dhcp-clean"
     
   tasks:
-    - name: 🔧 Configurar Python interpreter
-      raw: which python3 || which python
-      register: python_path
-      changed_when: false
-      
-    - name: 🧹 Limpiar ens34
+    - name: 📊 Estado inicial del sistema
       raw: |
-        ip link set ens34 down 2>/dev/null || true
-        ip addr flush dev ens34 2>/dev/null || true
-        nmcli connection show | grep ens34 | awk '{print $1}' | xargs -r nmcli connection delete 2>/dev/null || true
-        ip link set ens34 up 2>/dev/null || true
+        echo "=== ESTADO INICIAL ==="
+        echo "Conexiones actuales:"
+        nmcli connection show 2>/dev/null || echo "Sin conexiones"
+        echo "Estado de ens34:"
+        ip addr show ens34 2>/dev/null || echo "ens34 no disponible"
+      register: estado_inicial
+      
+    - name: 🧹 Limpieza COMPLETA de ens34
+      raw: |
+        echo "🧹 Iniciando limpieza completa..."
         
-    - name: 📦 Instalar NetworkManager
-      raw: apt update && apt install -y network-manager
+        # Parar NetworkManager
+        systemctl stop NetworkManager 2>/dev/null || true
+        sleep 2
+        
+        # Bajar interfaz
+        ip link set ens34 down 2>/dev/null || true
+        
+        # Limpiar IPs y rutas
+        ip addr flush dev ens34 2>/dev/null || true
+        ip route flush dev ens34 2>/dev/null || true
+        
+        # Reiniciar NetworkManager
+        systemctl start NetworkManager
+        sleep 5
+        
+        # Eliminar cualquier conexión residual después del reinicio
+        nmcli -t -f NAME connection show 2>/dev/null | while read conn; do
+          if [[ "$conn" == *"ens34"* ]] || [[ "$conn" == *"Wired"* ]] || [[ "$conn" == *"Ethernet"* ]] || [[ "$conn" == *"ethernet"* ]]; then
+            echo "Eliminando: $conn"
+            nmcli connection delete "$conn" 2>/dev/null || true
+          fi
+        done
+        
+        echo "✅ Limpieza completada"
       
-    - name: 🔌 Activar NetworkManager
-      raw: systemctl enable --now NetworkManager
+    - name: ⏱️ Pausa para estabilizar NetworkManager
+      raw: sleep 5
       
-    - name: 🌐 Configurar ens34 para DHCP del laboratorio
-      raw: nmcli connection add type ethernet ifname ens34 con-name lan-dhcp ipv4.method auto connection.autoconnect yes
+    - name: 🌐 Crear nueva conexión DHCP limpia
+      raw: |
+        echo "🌐 Creando conexión DHCP nueva..."
+        nmcli connection add \
+          type ethernet \
+          con-name "{{ connection_name }}" \
+          ifname {{ lan_interface }} \
+          autoconnect yes \
+          ipv4.method auto \
+          ipv6.method ignore \
+          connection.autoconnect-priority 100
+      register: crear_conexion
+      failed_when: false
       
-    - name: 🔌 Activar conexión LAN
-      raw: nmcli connection up lan-dhcp
+    - name: 🔄 Verificar si la conexión se creó correctamente
+      raw: nmcli connection show "{{ connection_name }}" >/dev/null 2>&1 && echo "OK" || echo "ERROR"
+      register: verificar_conexion
       
-    - name: ⏱️ Esperar DHCP
-      raw: sleep 10
+    - name: 🚀 Activar conexión nueva
+      raw: |
+        echo "🚀 Activando conexión..."
+        nmcli connection up "{{ connection_name }}"
+      register: activar_conexion
+      failed_when: false
+      when: "'OK' in verificar_conexion.stdout"
       
-    - name: 🔄 Renovar DHCP si es necesario
-      raw: dhclient -r ens34 && dhclient ens34
+    - name: ⏱️ Esperar obtención de IP por DHCP
+      raw: |
+        echo "⏱️ Esperando DHCP (30 segundos)..."
+        for i in {1..30}; do
+          IP=$(ip addr show ens34 | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+          if [[ -n "$IP" ]] && [[ "$IP" != "127.0.0.1" ]]; then
+            echo "✅ IP obtenida: $IP"
+            break
+          fi
+          echo "Intento $i/30: Esperando IP..."
+          sleep 1
+        done
+      
+    - name: 🔧 Forzar renovación DHCP si es necesario
+      raw: |
+        IP=$(ip addr show ens34 | grep "inet " | awk '{print $2}' | cut -d/ -f1)
+        if [[ -z "$IP" ]] || [[ "$IP" == "127.0.0.1" ]]; then
+          echo "🔧 Forzando renovación DHCP..."
+          dhclient -r ens34 2>/dev/null || true
+          sleep 2
+          dhclient ens34 2>/dev/null || true
+          sleep 5
+        fi
+      
+    - name: ⬆️ Asegurar que ens34 esté UP
+      raw: |
+        ip link set ens34 up 2>/dev/null || true
+        sleep 2
       
     - name: 🔑 Activar SSH
-      raw: systemctl enable --now ssh
+      raw: |
+        systemctl enable ssh 2>/dev/null || systemctl enable sshd 2>/dev/null || true
+        systemctl start ssh 2>/dev/null || systemctl start sshd 2>/dev/null || true
       
-    - name: 📊 Verificar ens34
-      raw: ip addr show ens34
-      register: ens34_result
+    - name: 📊 Verificar configuración final
+      raw: |
+        echo "=== VERIFICACIÓN FINAL ==="
+        echo "Estado de ens34:"
+        ip addr show ens34
+        echo ""
+        echo "Conexiones activas:"
+        nmcli connection show --active
+        echo ""
+        echo "Tabla de rutas:"
+        ip route show | grep ens34 || echo "Sin rutas para ens34"
+      register: estado_final
       
-    - name: 🌐 Verificar conectividad con gateway
-      raw: ping -c 3 192.168.50.1
+    - name: 🌐 Probar conectividad con gateway
+      raw: |
+        echo "🌐 Probando conectividad con gateway..."
+        if ping -c 3 -W 3 192.168.50.1 >/dev/null 2>&1; then
+          echo "✅ Conectividad OK con 192.168.50.1"
+          exit 0
+        else
+          echo "❌ Sin conectividad con 192.168.50.1"
+          echo "Verificando rutas..."
+          ip route show
+          exit 1
+        fi
       register: ping_result
       failed_when: false
       
-    - name: ✅ Mostrar resultado
+    - name: 📋 Mostrar resultado final
       debug:
         msg: |
-          mint_jhonatan configurada:
-          - ens34: DHCP habilitado ({{ ens34_result.stdout | regex_search('inet [0-9.]+') | default('IP pendiente') }})
-          - Gateway: {{ 'OK' if ping_result.rc == 0 else 'ERROR' }}
-          - SSH: Activo
+          🎉 CONFIGURACIÓN DE MINT_JHONATAN COMPLETADA
+          ============================================
+          Estado: {{ 'ÉXITO' if ping_result.rc == 0 else 'PARCIAL' }}
+          
+          📊 Detalles:
+          {{ estado_final.stdout }}
+          
+          🌐 Conectividad: {{ 'OK' if ping_result.rc == 0 else 'ERROR - Revisar configuración del router' }}
+          
+          ✅ mint_jhonatan está {{ 'lista para usar' if ping_result.rc == 0 else 'parcialmente configurada' }}
