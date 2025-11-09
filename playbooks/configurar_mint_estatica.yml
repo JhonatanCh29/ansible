@@ -1,0 +1,135 @@
+---
+# Playbook para configurar mint_jhonatan con IP ESTÁTICA del laboratorio
+# Ya confirmamos que hay conectividad con vm_jhonatan
+# Ejecutar en mint_jhonatan: ansible-playbook -c local -i localhost, playbooks/configurar_mint_estatica.yml --become-method=sudo -K
+
+- name: 💻 Configurar mint_jhonatan con IP ESTÁTICA del laboratorio
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    mint_ip: "192.168.50.20"
+    lab_gateway: "192.168.50.1"
+    lab_dns: "8.8.8.8,8.8.4.4"
+    
+  tasks:
+    - name: 📊 Estado inicial
+      raw: |
+        echo "=== ESTADO INICIAL ==="
+        ip addr show ens34
+        echo ""
+        nmcli connection show
+      register: estado_inicial
+      
+    - name: 🧹 Limpiar conexiones existentes de ens34
+      raw: |
+        echo "🧹 Limpiando conexiones de ens34..."
+        nmcli -t -f NAME,DEVICE connection show | while IFS=':' read name device; do
+          if [[ "$device" == "ens34" ]] || [[ "$name" == *"ens34"* ]] || [[ "$name" == *"lab-dhcp"* ]] || [[ "$name" == *"Wired"* ]]; then
+            echo "Eliminando: $name"
+            nmcli connection delete "$name" 2>/dev/null || true
+          fi
+        done
+      
+    - name: 🌐 Crear nueva conexión estática para el laboratorio
+      raw: |
+        echo "🌐 Creando conexión estática lab-mint..."
+        nmcli connection add \
+          type ethernet \
+          con-name "lab-mint" \
+          ifname ens34 \
+          autoconnect yes \
+          ipv4.addresses "{{ mint_ip }}/24" \
+          ipv4.gateway "{{ lab_gateway }}" \
+          ipv4.dns "{{ lab_dns }}" \
+          ipv4.method manual \
+          ipv6.method ignore \
+          connection.autoconnect-priority 100
+      
+    - name: 🚀 Activar nueva conexión
+      raw: |
+        echo "🚀 Activando conexión lab-mint..."
+        nmcli connection up lab-mint
+        sleep 5
+      
+    - name: ⬆️ Asegurar que ens34 esté UP
+      raw: |
+        ip link set ens34 up 2>/dev/null || true
+        sleep 2
+      
+    - name: 🔑 Activar SSH para acceso remoto
+      raw: |
+        echo "🔑 Activando SSH..."
+        systemctl enable ssh 2>/dev/null || systemctl enable sshd 2>/dev/null || true
+        systemctl start ssh 2>/dev/null || systemctl start sshd 2>/dev/null || true
+      
+    - name: 📊 Verificar configuración final
+      raw: |
+        echo "=== CONFIGURACIÓN FINAL ==="
+        echo "Estado de ens34:"
+        ip addr show ens34
+        echo ""
+        echo "Conexiones activas:"
+        nmcli connection show --active
+        echo ""
+        echo "Tabla de rutas:"
+        ip route show
+      register: estado_final
+      
+    - name: 🧪 Probar conectividad completa
+      raw: |
+        echo "🧪 PRUEBAS DE CONECTIVIDAD:"
+        echo "=========================="
+        
+        echo "1. Ping al router (vm_jhonatan):"
+        if ping -c 3 192.168.50.1 >/dev/null 2>&1; then
+          echo "✅ Router accesible"
+        else
+          echo "❌ Router NO accesible"
+          exit 1
+        fi
+        
+        echo ""
+        echo "2. Ping a DNS externo:"
+        if ping -c 3 8.8.8.8 >/dev/null 2>&1; then
+          echo "✅ Internet accesible"
+        else
+          echo "⚠️ Internet NO accesible (posible problema de NAT en router)"
+        fi
+        
+        echo ""
+        echo "3. Resolución DNS:"
+        if nslookup google.com >/dev/null 2>&1; then
+          echo "✅ DNS funcional"
+        else
+          echo "⚠️ DNS NO funcional"
+        fi
+      register: pruebas_conectividad
+      failed_when: false
+      
+    - name: 📋 Resumen final
+      debug:
+        msg: |
+          🎉 MINT_JHONATAN CONFIGURADO EXITOSAMENTE
+          ========================================
+          
+          📊 Estado final:
+          {{ estado_final.stdout }}
+          
+          🧪 Pruebas de conectividad:
+          {{ pruebas_conectividad.stdout }}
+          
+          ✅ mint_jhonatan configurado con:
+          - IP estática: {{ mint_ip }}/24
+          - Gateway: {{ lab_gateway }}
+          - DNS: {{ lab_dns }}
+          - SSH: Activo
+          
+          🚀 LABORATORIO LISTO PARA USAR
+          ==============================
+          - vm_jhonatan: 192.168.50.1 (Router/DHCP)
+          - mint_jhonatan: {{ mint_ip }} (Cliente)
+          - Próximo: Configurar vm_control

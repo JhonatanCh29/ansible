@@ -1,0 +1,172 @@
+---
+# Playbook para configurar vm_control como centro de control Ansible
+# Ejecutar EN vm_control: ansible-playbook -c local -i localhost, playbooks/configurar_control_ansible.yml --become-method=sudo -K
+
+- name: 🎛️ Configurar vm_control como centro de control Ansible
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    
+  tasks:
+    - name: 📦 Instalar herramientas necesarias
+      raw: |
+        echo "📦 Instalando herramientas..."
+        apt update
+        apt install -y ansible sshpass openssh-client git curl python3-pip
+      
+    - name: 🔑 Generar clave SSH para Ansible (si no existe)
+      raw: |
+        echo "🔑 Configurando SSH para Ansible..."
+        if [ ! -f ~/.ssh/id_rsa ]; then
+          ssh-keygen -t rsa -b 4096 -C "ansible@control" -f ~/.ssh/id_rsa -N ""
+          echo "✅ Clave SSH generada"
+        else
+          echo "✅ Clave SSH ya existe"
+        fi
+        
+        # Mostrar clave pública para copiar a otras VMs
+        echo "📋 CLAVE PÚBLICA SSH (copiar a otras VMs):"
+        echo "=========================================="
+        cat ~/.ssh/id_rsa.pub
+        echo "=========================================="
+      register: ssh_setup
+      
+    - name: 📊 Verificar conectividad con las VMs del laboratorio
+      raw: |
+        echo "📊 VERIFICANDO CONECTIVIDAD:"
+        echo "=========================="
+        
+        echo "1. Ping a vm_jhonatan (192.168.50.1):"
+        if ping -c 2 192.168.50.1 >/dev/null 2>&1; then
+          echo "✅ vm_jhonatan accesible"
+        else
+          echo "❌ vm_jhonatan NO accesible"
+        fi
+        
+        echo ""
+        echo "2. Ping a mint_jhonatan (192.168.50.20):"
+        if ping -c 2 192.168.50.20 >/dev/null 2>&1; then
+          echo "✅ mint_jhonatan accesible"
+        else
+          echo "❌ mint_jhonatan NO accesible"
+        fi
+        
+        echo ""
+        echo "3. Estado de la red local:"
+        ip addr show ens34 | grep inet
+      register: conectividad_check
+      
+    - name: 📝 Crear inventario actualizado
+      raw: |
+        echo "📝 Creando inventario de Ansible..."
+        
+        # Crear directorio de inventario si no existe
+        mkdir -p ~/ansible/inventory/group_vars
+        
+        # Crear hosts.yml actualizado
+        cat > ~/ansible/inventory/hosts.yml << 'EOF'
+        ---
+        all:
+          children:
+            lab_academico:
+              hosts:
+                vm_jhonatan:
+                  ansible_host: 192.168.50.1
+                  ansible_user: jhonatan
+                  ansible_ssh_pass: "{{ vault_jhonatan_password }}"
+                  ansible_become_pass: "{{ vault_jhonatan_password }}"
+                  vm_role: router
+                  os_type: fedora
+                mint_jhonatan:
+                  ansible_host: 192.168.50.20
+                  ansible_user: jhonatan
+                  ansible_ssh_pass: "{{ vault_jhonatan_password }}"
+                  ansible_become_pass: "{{ vault_jhonatan_password }}"
+                  vm_role: client
+                  os_type: mint
+              vars:
+                ansible_python_interpreter: /usr/bin/python3
+                ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+        EOF
+        
+        echo "✅ Inventario creado en ~/ansible/inventory/hosts.yml"
+      
+    - name: 🔐 Configurar ansible.cfg
+      raw: |
+        echo "🔐 Configurando ansible.cfg..."
+        
+        cat > ~/ansible/ansible.cfg << 'EOF'
+        [defaults]
+        inventory = inventory/hosts.yml
+        host_key_checking = False
+        timeout = 30
+        remote_user = jhonatan
+        ask_pass = True
+        ask_become_pass = True
+        
+        [inventory]
+        enable_plugins = yaml
+        
+        [ssh_connection]
+        ssh_args = -o ControlMaster=auto -o ControlPersist=60s -o StrictHostKeyChecking=no
+        control_path_dir = ~/.ansible/cp
+        EOF
+        
+        echo "✅ ansible.cfg configurado"
+      
+    - name: 🧪 Crear playbook de prueba
+      raw: |
+        echo "🧪 Creando playbook de prueba..."
+        
+        cat > ~/ansible/test_conectividad.yml << 'EOF'
+        ---
+        - name: 🧪 Prueba de conectividad del laboratorio
+          hosts: lab_academico
+          gather_facts: yes
+          tasks:
+            - name: 📊 Obtener información del sistema
+              raw: |
+                echo "=== INFORMACIÓN DEL SISTEMA ==="
+                hostname
+                whoami
+                ip addr show ens34 | grep inet
+                uptime
+              register: system_info
+              
+            - name: 📋 Mostrar información
+              debug:
+                msg: |
+                  Sistema: {{ inventory_hostname }}
+                  Info: {{ system_info.stdout }}
+        EOF
+        
+        echo "✅ Playbook de prueba creado"
+      
+    - name: 📋 Mostrar instrucciones finales
+      debug:
+        msg: |
+          🎉 VM_CONTROL CONFIGURADA COMO CENTRO ANSIBLE
+          ===========================================
+          
+          📊 Estado:
+          {{ conectividad_check.stdout }}
+          
+          🔑 Clave SSH:
+          {{ ssh_setup.stdout }}
+          
+          🚀 PRÓXIMOS PASOS:
+          ================
+          1. Copiar la clave SSH pública a las otras VMs
+          2. Probar conectividad con: ansible all -m ping
+          3. Ejecutar playbook de prueba: ansible-playbook test_conectividad.yml
+          
+          📁 ARCHIVOS CREADOS:
+          - ~/ansible/inventory/hosts.yml (Inventario)
+          - ~/ansible/ansible.cfg (Configuración)
+          - ~/ansible/test_conectividad.yml (Prueba)
+          
+          ✅ LABORATORIO DE ANSIBLE LISTO PARA USAR
