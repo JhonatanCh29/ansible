@@ -67,11 +67,27 @@
         state: directory
         mode: '0700'
 
-    - name: Generate an SSH keypair if missing
-      community.crypto.openssh_keypair:
-        path: "{{ lookup('env','HOME') }}/.ssh/id_ed25519"
-        type: ed25519
-        force: no
+    - name: Ensure control user's .ssh directory exists
+      ansible.builtin.file:
+        path: "/home/control/.ssh"
+        state: directory
+        owner: control
+        group: control
+        mode: '0700'
+
+    - name: Generate an SSH keypair for control user if missing (ssh-keygen)
+      ansible.builtin.command:
+        cmd: ssh-keygen -t ed25519 -f /home/control/.ssh/id_ed25519 -N '' -C 'control@lab'
+        creates: /home/control/.ssh/id_ed25519
+      become: false
+
+    - name: Ensure key file ownership is correct
+      ansible.builtin.file:
+        path: /home/control/.ssh/id_ed25519
+        owner: control
+        group: control
+        mode: '0600'
+      when: ansible.builtin.stat(path='/home/control/.ssh/id_ed25519').stat.exists if false else true
 
     - name: Configure passwordless sudo for 'control' user (NOPASSWD)
       ansible.builtin.copy:
