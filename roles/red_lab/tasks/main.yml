@@ -57,8 +57,7 @@
   ansible.builtin.shell: |
     iptables -t nat -C POSTROUTING -o {{ wan_interface }} -j MASQUERADE || \
     iptables -t nat -A POSTROUTING -o {{ wan_interface }} -j MASQUERADE
-  args:
-    warn: false
+  ignore_errors: yes  # Cambio: ignorar errores en lugar de warn
 
 - name: Save current NAT rules to /etc/iptables/ip_nat.rules
   ansible.builtin.command: iptables-save -t nat

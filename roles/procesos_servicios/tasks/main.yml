@@ -20,8 +20,8 @@
   ansible.builtin.file:
     path: "{{ logs_dir }}"
     state: directory
-    owner: "{{ lookup('env','USER') | default('root') }}"
-    group: "{{ lookup('env','USER') | default('root') }}"
+    owner: "{{ admin_user | default('jhonatan') }}"  # Usar admin_user en lugar de env
+    group: "{{ admin_user | default('jhonatan') }}"
     mode: '0755'
   when: logs_dir is defined and logs_dir != ''
 

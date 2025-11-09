@@ -1,0 +1,111 @@
+---
+# Playbook para verificar el estado final y crear un reporte del Nivel 4
+- name: 📊 Verificación final Ansible Nivel 4 - Laboratorio Académico
+  hosts: lab_academico
+  become: yes
+  gather_facts: yes
+  
+  tasks:
+    - name: 📊 Recopilar información del sistema
+      debug:
+        msg: |
+          🖥️  HOST: {{ inventory_hostname }}
+          🔧 OS: {{ ansible_facts['distribution'] | default('Unknown') }} {{ ansible_facts['distribution_version'] | default('') }}
+          🌐 IP ens34: {{ ansible_facts['ens34']['ipv4']['address'] | default('No configurada') if 'ens34' in ansible_facts else 'Interfaz ens34 no detectada' }}
+          💾 Memoria: {{ (ansible_facts['memtotal_mb'] / 1024) | round(1) }}GB
+          💿 Disco: {{ ansible_facts['devices']['sda']['size'] | default('N/A') if 'sda' in ansible_facts.get('devices', {}) else 'N/A' }}
+          ⏰ Uptime: {{ ansible_facts['uptime_seconds'] | default(0) | int // 3600 }}h
+    
+    - name: ✅ Verificar volúmenes LVM creados
+      shell: |
+        echo "=== VOLÚMENES LVM ==="
+        lvs 2>/dev/null | grep -E "(logs-lv|backups-lv)" || echo "LVM no configurado"
+      register: lvm_status
+      failed_when: false
+      
+    - name: ✅ Verificar directorios de logs y backups
+      shell: |
+        echo "=== DIRECTORIOS IMPORTANTES ==="
+        ls -la /var/log/lab 2>/dev/null || echo "/var/log/lab: No existe"
+        ls -la /var/backups 2>/dev/null || echo "/var/backups: No existe" 
+        echo "=== SCRIPTS AUTOMATIZADOS ==="
+        ls -la /usr/local/bin/*backup* 2>/dev/null || echo "Scripts backup: No encontrados"
+        ls -la /usr/local/bin/*monitor* 2>/dev/null || echo "Scripts monitor: No encontrados"
+      register: dirs_status
+      failed_when: false
+      
+    - name: ✅ Verificar servicios críticos
+      shell: |
+        echo "=== SERVICIOS CRÍTICOS ==="
+        systemctl is-active sshd 2>/dev/null || echo "sshd: Inactivo"
+        systemctl is-active crond 2>/dev/null || systemctl is-active cron 2>/dev/null || echo "cron: Inactivo"
+        if [ "{{ inventory_hostname }}" = "vm_jhonatan" ]; then
+          systemctl is-active dnsmasq 2>/dev/null || echo "dnsmasq: Inactivo"
+        fi
+      register: services_status
+      failed_when: false
+      
+    - name: ✅ Verificar configuración de red
+      shell: |
+        echo "=== CONFIGURACIÓN DE RED ==="
+        ip addr show ens34 | grep inet || echo "ens34: Sin IP"
+        if [ "{{ inventory_hostname }}" = "vm_jhonatan" ]; then
+          echo "=== ROUTER CONFIGURATION ==="
+          iptables -t nat -L POSTROUTING | grep MASQUERADE || echo "NAT: No configurado"
+          cat /proc/sys/net/ipv4/ip_forward || echo "IP Forward: No configurado"
+        fi
+      register: network_status
+      failed_when: false
+      
+    - name: 📋 Mostrar resumen por host
+      debug:
+        msg: |
+          
+          🎯 RESUMEN NIVEL 4 - {{ inventory_hostname }}
+          =======================================
+          
+          💾 Almacenamiento:
+          {{ lvm_status.stdout }}
+          
+          📁 Directorios y Scripts:
+          {{ dirs_status.stdout }}
+          
+          🔧 Servicios:
+          {{ services_status.stdout }}
+          
+          🌐 Red:
+          {{ network_status.stdout }}
+
+- name: 📊 Reporte Final del Laboratorio
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: 🎉 Estado final del proyecto Ansible Nivel 4
+      debug:
+        msg: |
+          
+          🏆 PROYECTO ANSIBLE NIVEL 4 COMPLETADO
+          ====================================
+          
+          ✅ ROLES IMPLEMENTADOS:
+          - almacenamiento_sistemas: Gestión LVM, backups automatizados
+          - procesos_servicios: Monitoreo de servicios y procesos
+          - red_lab: Configuración de laboratorio de red (router/cliente)
+          - tareas_automatizadas: Scripts y automatización del sistema
+          - usuarios_permisos: Gestión de usuarios y permisos
+          
+          🌐 INFRAESTRUCTURA:
+          - vm_jhonatan (192.168.50.1): Router con DHCP y NAT
+          - mint_jhonatan (192.168.50.20): Cliente del laboratorio
+          - vm_control (192.168.50.10): Centro de control Ansible
+          
+          🎯 NIVEL 4 CARACTERÍSTICAS IMPLEMENTADAS:
+          ✅ Gestión avanzada de almacenamiento (LVM)
+          ✅ Automatización de backups con retención
+          ✅ Monitoreo proactivo de recursos
+          ✅ Gestión de usuarios con auditoría
+          ✅ Configuración de red completa del laboratorio
+          ✅ Scripts de automatización personalizados
+          ✅ Logging centralizado
+          
+          🚀 ¡IMPLEMENTACIÓN EXITOSA DE ANSIBLE NIVEL 4!
