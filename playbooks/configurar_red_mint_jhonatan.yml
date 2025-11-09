@@ -22,6 +22,22 @@
       ansible.builtin.debug:
         var: interfaces.stdout_lines
         
+    - name: 🧹 LIMPIAR COMPLETAMENTE la interfaz ens34
+      ansible.builtin.shell: |
+        # Bajar la interfaz
+        ip link set ens34 down 2>/dev/null || true
+        # Limpiar cualquier IP asignada
+        ip addr flush dev ens34 2>/dev/null || true
+        # Eliminar todas las conexiones de NetworkManager en ens34
+        nmcli connection show | grep ens34 | awk '{print $1}' | xargs -r nmcli connection delete 2>/dev/null || true
+        # Subir la interfaz limpia
+        ip link set ens34 up 2>/dev/null || true
+      register: cleanup_ens34
+      
+    - name: 📋 Resultado de limpieza ens34
+      ansible.builtin.debug:
+        var: cleanup_ens34.stdout_lines
+        
     - name: Detectar distribución
       ansible.builtin.set_fact:
         is_mint: "{{ 'mint' in ansible_distribution|lower or 'ubuntu' in ansible_distribution|lower }}"
