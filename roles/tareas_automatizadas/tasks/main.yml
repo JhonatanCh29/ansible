@@ -1,16 +1,33 @@
 ---
 # 📌 Rol: Automatización de tareas avanzada
 
-# ✅ 1. Instalar herramientas necesarias para automatización
-- name: Instalar herramientas de automatización
+# ✅ 1. Instalar herramientas necesarias para automatización (Fedora/CentOS)
+- name: Instalar herramientas de automatización en Fedora/CentOS
   become: yes
   ansible.builtin.package:
     name:
-      - cron
+      - cronie     # cron en Fedora
       - logrotate
       - rsync
-      - mailutils
+      - mailx      # mailutils en Fedora
+      - at
     state: present
+  when: ansible_facts['os_family'] == "RedHat"
+  ignore_errors: yes
+
+# ✅ 1b. Instalar herramientas necesarias para automatización (Ubuntu/Mint)  
+- name: Instalar herramientas de automatización en Ubuntu/Mint
+  become: yes
+  ansible.builtin.package:
+    name:
+      - cron       # cron en Ubuntu
+      - logrotate
+      - rsync
+      - mailutils  # mailutils en Ubuntu
+      - at
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  ignore_errors: yes
 
 # ✅ 2. Configurar actualización automática del sistema
 - name: Configurar actualización automática
