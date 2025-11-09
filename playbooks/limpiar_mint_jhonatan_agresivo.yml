@@ -1,0 +1,97 @@
+---
+- name: Limpieza agresiva de interfaces de red en VMs del laboratorio
+  hosts: mint_jhonatan
+  gather_facts: no
+  become: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+
+  tasks:
+    - name: "📊 Mostrar conexiones actuales ANTES de limpiar"
+      raw: nmcli connection show 2>/dev/null || echo "No hay conexiones"
+      register: conexiones_antes
+      
+    - name: "📊 Mostrar estado de ens34 ANTES"
+      raw: ip addr show ens34 2>/dev/null || echo "ens34 no encontrada"
+      register: ens34_antes
+      
+    - name: "🔥 Parar NetworkManager temporalmente"
+      raw: systemctl stop NetworkManager
+      
+    - name: "⬇️ Bajar interfaz ens34"
+      raw: ip link set ens34 down 2>/dev/null || true
+      
+    - name: "🧹 Limpiar TODAS las IPs de ens34"
+      raw: ip addr flush dev ens34 2>/dev/null || true
+      
+    - name: "🗺️ Limpiar rutas de ens34"
+      raw: ip route flush dev ens34 2>/dev/null || true
+      
+    - name: "🗑️ Limpiar cache ARP de ens34"
+      raw: ip neigh flush dev ens34 2>/dev/null || true
+      
+    - name: "🔄 Reiniciar NetworkManager"
+      raw: systemctl start NetworkManager
+      
+    - name: "⏱️ Esperar que NetworkManager se estabilice"
+      raw: sleep 5
+      
+    - name: "🗑️ Eliminar TODAS las conexiones automáticas de ethernet"
+      raw: |
+        nmcli -t -f NAME,DEVICE connection show 2>/dev/null | while IFS=':' read name device; do
+          if [[ "$name" == *"ens34"* ]] || [[ "$device" == "ens34" ]] || [[ "$name" == *"Wired"* ]] || [[ "$name" == *"Ethernet"* ]] || [[ "$name" == *"ethernet"* ]]; then
+            echo "Eliminando: $name"
+            nmcli connection delete "$name" 2>/dev/null || true
+          fi
+        done
+      register: eliminacion_conexiones
+      
+    - name: "⏱️ Pausa después de eliminar conexiones"
+      raw: sleep 3
+      
+    - name: "⬆️ Subir interfaz ens34 limpia"
+      raw: ip link set ens34 up 2>/dev/null || true
+      
+    - name: "⏱️ Pausa final para estabilizar"
+      raw: sleep 3
+      
+    - name: "✅ Crear nueva conexión DHCP para ens34"
+      raw: nmcli connection add type ethernet con-name "lab-ens34" ifname ens34 autoconnect yes
+      
+    - name: "🔧 Configurar conexión para DHCP"
+      raw: nmcli connection modify "lab-ens34" ipv4.method auto ipv6.method ignore
+      
+    - name: "🚀 Activar nueva conexión"
+      raw: nmcli connection up "lab-ens34"
+      
+    - name: "⏱️ Esperar obtención de IP por DHCP"
+      raw: sleep 10
+      
+    - name: "📊 Mostrar estado FINAL de ens34"
+      raw: ip addr show ens34
+      register: estado_final
+      
+    - name: "📊 Mostrar conexiones FINALES"
+      raw: nmcli connection show
+      register: conexiones_finales
+      
+    - name: "🧪 Probar conectividad con gateway (192.168.50.1)"
+      raw: ping -c 3 192.168.50.1 || echo "No hay conectividad con gateway aún"
+      register: test_conectividad
+
+  handlers:
+    - name: "🔄 Reiniciar NetworkManager si es necesario"
+      raw: systemctl restart NetworkManager
+
+- name: Mostrar resultados de la limpieza
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "📋 Resumen de la limpieza agresiva"
+      debug:
+        msg: |
+          🔥 LIMPIEZA AGRESIVA COMPLETADA
+          ===============================
+          ✅ Interfaces limpiadas y reconfiguradas
+          ✅ Nueva conexión DHCP creada: lab-ens34
+          ✅ Lista para obtener IP automática del router (vm_jhonatan)
