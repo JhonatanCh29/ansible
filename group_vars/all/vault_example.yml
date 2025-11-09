@@ -1,0 +1,17 @@
+---
+# Ejemplo de variables sensibles. NO guardes secretos en texto plano en el repo.
+# Para crear el archivo cifrado y usarlo, ejecuta:
+#   ansible-vault create group_vars/all/vault.yml
+# y pega dentro las variables en formato YAML como en este ejemplo.
+
+# Ejemplo (no cifrado):
+# ansible_ssh_pass_vm_jhonatan: "qwe123$"
+# ansible_ssh_pass_mint_jhonatan: "qwe123$"
+
+# Después, en el inventario puedes referenciar estas variables vía host_vars o
+# group_vars y Ansible las usará cuando ejecutes playbooks. Para usar el archivo
+# cifrado en ejecución, Ansible te pedirá la passphrase, o usa --vault-password-file
+
+# Para crear el archivo cifrado con el contenido, ejecuta en la máquina control:
+#   ansible-vault create group_vars/all/vault.yml
+# (o ansible-vault encrypt group_vars/all/vault_example.yml && mv to vault.yml)

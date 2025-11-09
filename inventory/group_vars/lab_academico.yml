@@ -11,3 +11,6 @@ dhcp_lease_time: "12h"
 dns_forwarders:
   - "8.8.8.8"
   - "8.8.4.4"
+
+# Directorio remoto para guardar logs (opcional). Si no aplica, dejar en cadena vacía.
+logs_dir: "/home/jhonatan/Escritorio/logs"
