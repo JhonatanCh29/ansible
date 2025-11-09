@@ -7,7 +7,7 @@
   hosts: localhost
   connection: local
   gather_facts: yes
-  become: true
+  # Do not use global become here; escalate only on tasks that need root
   tasks:
     - name: Ensure apt cache is updated
       ansible.builtin.apt:
@@ -35,8 +35,6 @@
       ansible.builtin.command:
         cmd: python3 -m venv {{ venv_path }}
         creates: "{{ venv_path }}/bin/activate"
-      become: true
-      become_user: root
 
     - name: Install python packages (ansible-core, ansible-lint, yamllint) into the venv
       ansible.builtin.pip:
@@ -45,14 +43,10 @@
           - ansible-lint
           - yamllint
         virtualenv: "{{ venv_path }}"
-      become: true
-      become_user: root
 
-    - name: Install common Ansible collections (community.general, ansible.posix) into the user's environment
+    - name: Install common Ansible collections (community.general, ansible.posix, community.crypto) into the user's environment
       ansible.builtin.command:
-        cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general ansible.posix"
-      become: true
-      become_user: root
+        cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general ansible.posix community.crypto"
 
     - name: Ensure venv ownership is control user
       ansible.builtin.file:
@@ -60,6 +54,7 @@
         owner: "{{ control_user }}"
         group: "{{ control_user }}"
         recurse: yes
+      become: true
 
     - name: Ensure ~/.ssh exists
       ansible.builtin.file:
@@ -71,9 +66,12 @@
       ansible.builtin.file:
         path: "/home/control/.ssh"
         state: directory
-        owner: control
-        group: control
         mode: '0700'
+
+    - name: Check if control private key exists
+      ansible.builtin.stat:
+        path: /home/control/.ssh/id_ed25519
+      register: control_key_stat
 
     - name: Generate an SSH keypair for control user if missing (ssh-keygen)
       ansible.builtin.command:
@@ -81,13 +79,11 @@
         creates: /home/control/.ssh/id_ed25519
       become: false
 
-    - name: Ensure key file ownership is correct
+    - name: Ensure key file permissions are correct
       ansible.builtin.file:
         path: /home/control/.ssh/id_ed25519
-        owner: control
-        group: control
         mode: '0600'
-      when: ansible.builtin.stat(path='/home/control/.ssh/id_ed25519').stat.exists if false else true
+      when: control_key_stat.stat.exists
 
     - name: Configure passwordless sudo for 'control' user (NOPASSWD)
       ansible.builtin.copy:
@@ -96,6 +92,7 @@
         owner: root
         group: root
         mode: '0440'
+      become: true
 
     - name: Show next steps message
       ansible.builtin.debug:
