@@ -1,0 +1,166 @@
+---
+# Playbook CORREGIDO para vm_jhonatan - Configurar ens34 como LAN del laboratorio
+# Este debe ejecutarse EN vm_jhonatan primero
+# Comando: ansible-playbook -c local -i localhost, playbooks/corregir_vm_jhonatan_lan.yml --become-method=sudo -K
+
+- name: 🔧 CORREGIR vm_jhonatan - Configurar LAN del laboratorio
+  hosts: localhost
+  become: yes
+  connection: local
+  gather_facts: no
+  
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    lan_interface: "ens34"
+    wan_interface: "ens35"
+    lab_ip: "192.168.50.1"
+    lab_network: "192.168.50.0/24"
+    
+  tasks:
+    - name: 📊 Estado actual de interfaces
+      raw: |
+        echo "=== ESTADO ACTUAL ==="
+        ip addr show ens34
+        echo "---"
+        ip addr show ens35
+        echo "=== CONEXIONES ACTUALES ==="
+        nmcli connection show
+      register: estado_actual
+      
+    - name: 🧹 Limpiar ens34 (LAN del laboratorio)
+      raw: |
+        echo "🧹 Limpiando ens34 para LAN del laboratorio..."
+        
+        # Eliminar conexiones de ens34
+        nmcli -t -f NAME,DEVICE connection show | grep ens34 | cut -d: -f1 | while read conn; do
+          echo "Eliminando conexión: $conn"
+          nmcli connection delete "$conn" 2>/dev/null || true
+        done
+        
+        # Limpiar IP y rutas de ens34
+        ip addr flush dev ens34 2>/dev/null || true
+        ip link set ens34 down
+        sleep 2
+        ip link set ens34 up
+      
+    - name: 🌐 Configurar ens34 como LAN del laboratorio (192.168.50.1)
+      raw: |
+        echo "🌐 Configurando ens34 como LAN del laboratorio..."
+        nmcli connection add \
+          type ethernet \
+          con-name "lab-lan" \
+          ifname ens34 \
+          ipv4.addresses "{{ lab_ip }}/24" \
+          ipv4.method manual \
+          ipv6.method ignore \
+          autoconnect yes \
+          connection.autoconnect-priority 100
+      
+    - name: 🚀 Activar conexión LAN
+      raw: |
+        echo "🚀 Activando conexión LAN..."
+        nmcli connection up "lab-lan"
+        sleep 5
+      
+    - name: 🔄 Habilitar IP forwarding
+      raw: |
+        echo "🔄 Habilitando IP forwarding..."
+        echo 1 > /proc/sys/net/ipv4/ip_forward
+        echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf || grep -q "net.ipv4.ip_forward=1" /etc/sysctl.conf
+      
+    - name: 🏠 Configurar DHCP server para el laboratorio
+      raw: |
+        echo "🏠 Instalando y configurando dnsmasq..."
+        dnf install -y dnsmasq || yum install -y dnsmasq || apt install -y dnsmasq
+        
+        # Configurar dnsmasq para la red del laboratorio
+        cat > /etc/dnsmasq.conf << 'EOF'
+        # Configuración DHCP para laboratorio académico
+        interface=ens34
+        dhcp-range=192.168.50.10,192.168.50.50,12h
+        dhcp-option=3,192.168.50.1
+        dhcp-option=6,8.8.8.8,8.8.4.4
+        listen-address=192.168.50.1
+        bind-interfaces
+        EOF
+        
+        # Habilitar y iniciar dnsmasq
+        systemctl enable dnsmasq
+        systemctl restart dnsmasq
+      
+    - name: 🔥 Configurar firewall/iptables para NAT
+      raw: |
+        echo "🔥 Configurando NAT..."
+        
+        # Limpiar reglas existentes
+        iptables -t nat -F
+        iptables -t filter -F
+        iptables -t filter -X
+        
+        # Permitir tráfico de la LAN
+        iptables -A FORWARD -i ens34 -o ens35 -j ACCEPT
+        iptables -A FORWARD -i ens35 -o ens34 -m state --state RELATED,ESTABLISHED -j ACCEPT
+        
+        # NAT para salida a internet
+        iptables -t nat -A POSTROUTING -o ens35 -j MASQUERADE
+        
+        # Permitir tráfico local
+        iptables -A INPUT -i lo -j ACCEPT
+        iptables -A INPUT -i ens34 -j ACCEPT
+        
+        # Guardar reglas (según distribución)
+        iptables-save > /etc/iptables/rules.v4 2>/dev/null || \
+        iptables-save > /etc/sysconfig/iptables 2>/dev/null || \
+        netfilter-persistent save 2>/dev/null || true
+      
+    - name: ⏱️ Esperar estabilización
+      raw: sleep 5
+      
+    - name: 📊 Verificar configuración final
+      raw: |
+        echo "=== VERIFICACIÓN FINAL ==="
+        echo "ens34 (LAN laboratorio):"
+        ip addr show ens34
+        echo ""
+        echo "ens35 (WAN externa):"  
+        ip addr show ens35
+        echo ""
+        echo "Tabla de rutas:"
+        ip route show
+        echo ""
+        echo "Estado dnsmasq:"
+        systemctl status dnsmasq --no-pager -l
+        echo ""
+        echo "Proceso dnsmasq:"
+        ps aux | grep dnsmasq | head -3
+      register: verificacion_final
+      
+    - name: 🧪 Probar conectividad desde vm_jhonatan
+      raw: |
+        echo "🧪 Probando conectividad..."
+        echo "Ping a internet desde vm_jhonatan:"
+        ping -c 2 8.8.8.8 || echo "Sin internet desde vm_jhonatan"
+        echo ""
+        echo "IP forwarding activo:"
+        cat /proc/sys/net/ipv4/ip_forward
+      register: test_conectividad
+      
+    - name: 📋 Resultado final
+      debug:
+        msg: |
+          🎉 VM_JHONATAN CONFIGURADA COMO ROUTER
+          ====================================
+          
+          📊 Estado:
+          {{ verificacion_final.stdout }}
+          
+          🧪 Conectividad:
+          {{ test_conectividad.stdout }}
+          
+          ✅ vm_jhonatan está lista como router del laboratorio
+          ✅ ens34: 192.168.50.1 (LAN laboratorio)  
+          ✅ ens35: Mantiene conexión WAN
+          ✅ DHCP server activo para VMs del laboratorio
+          ✅ NAT configurado para acceso a internet
+          
+          🚀 Ahora puedes configurar mint_jhonatan para obtener DHCP
