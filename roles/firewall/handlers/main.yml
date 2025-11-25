@@ -1,0 +1,28 @@
+---
+# Handlers para el rol firewall
+
+- name: reload ufw
+  become: yes
+  ansible.builtin.systemd:
+    name: ufw
+    state: reloaded
+  listen: "reload ufw"
+
+- name: restart ufw
+  become: yes
+  ansible.builtin.systemd:
+    name: ufw
+    state: restarted
+  listen: "restart ufw"
+
+- name: enable ufw
+  become: yes
+  ansible.builtin.ufw:
+    state: enabled
+  listen: "enable ufw"
+
+- name: disable ufw
+  become: yes
+  ansible.builtin.ufw:
+    state: disabled
+  listen: "disable ufw"

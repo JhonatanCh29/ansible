@@ -1,0 +1,214 @@
+---
+# 🔥 Rol: Configuración de Firewall UFW - Nivel 4 Académico
+
+# ✅ 1. Instalar UFW (Uncomplicated Firewall)
+- name: "🔥 Instalar UFW"
+  become: yes
+  ansible.builtin.package:
+    name: ufw
+    state: present
+  tags: firewall_install
+
+# ✅ 2. Resetear UFW a configuración limpia
+- name: "🔄 Resetear configuración UFW"
+  become: yes
+  ansible.builtin.command: ufw --force reset
+  when: firewall_reset | default(false)
+  tags: firewall_reset
+
+# ✅ 3. Configurar política por defecto
+- name: "🚫 Configurar política por defecto - DENY incoming"
+  become: yes
+  ansible.builtin.ufw:
+    direction: incoming
+    policy: "{{ firewall_default_policy | default('deny') }}"
+  tags: firewall_policy
+
+- name: "✅ Configurar política por defecto - ALLOW outgoing"
+  become: yes
+  ansible.builtin.ufw:
+    direction: outgoing
+    policy: "{{ firewall_outgoing_policy | default('allow') }}"
+  tags: firewall_policy
+
+- name: "🔄 Configurar política por defecto - DENY routed"
+  become: yes
+  ansible.builtin.ufw:
+    direction: routed
+    policy: deny
+  tags: firewall_policy
+
+# ✅ 4. Configurar reglas básicas de firewall
+- name: "🔐 Permitir SSH (puerto 22)"
+  become: yes
+  ansible.builtin.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    comment: 'SSH Access'
+  tags: firewall_rules
+
+- name: "🌐 Permitir HTTP (puerto 80)"
+  become: yes
+  ansible.builtin.ufw:
+    rule: allow
+    port: '80'
+    proto: tcp
+    comment: 'HTTP Web Server'
+  when: firewall_allow_http | default(true)
+  tags: firewall_rules
+
+- name: "🔒 Permitir HTTPS (puerto 443)"
+  become: yes
+  ansible.builtin.ufw:
+    rule: allow
+    port: '443'
+    proto: tcp
+    comment: 'HTTPS Web Server'
+  when: firewall_allow_https | default(true)
+  tags: firewall_rules
+
+# ✅ 5. Configurar reglas personalizadas
+- name: "⚙️ Configurar reglas personalizadas"
+  become: yes
+  ansible.builtin.ufw:
+    rule: "{{ item.rule }}"
+    port: "{{ item.port | default(omit) }}"
+    proto: "{{ item.proto | default('tcp') }}"
+    src: "{{ item.src | default(omit) }}"
+    dest: "{{ item.dest | default(omit) }}"
+    comment: "{{ item.comment | default('Custom rule') }}"
+  loop: "{{ firewall_custom_rules | default([]) }}"
+  tags: firewall_custom
+
+# ✅ 6. Configurar logging del firewall
+- name: "📝 Configurar logging UFW"
+  become: yes
+  ansible.builtin.ufw:
+    logging: "{{ firewall_logging | default('low') }}"
+  tags: firewall_logging
+
+# ✅ 7. Habilitar UFW
+- name: "🔥 Habilitar UFW"
+  become: yes
+  ansible.builtin.ufw:
+    state: enabled
+  when: firewall_enabled | default(true)
+  tags: firewall_enable
+
+# ✅ 8. Verificar estado del firewall
+- name: "📊 Verificar estado de UFW"
+  become: yes
+  ansible.builtin.command: ufw status verbose
+  register: ufw_status
+  changed_when: false
+  tags: firewall_status
+
+- name: "📋 Mostrar estado actual del firewall"
+  ansible.builtin.debug:
+    msg: "{{ ufw_status.stdout_lines }}"
+  tags: firewall_status
+
+# ✅ 9. Configurar reglas de rate limiting para SSH
+- name: "🛡️ Configurar rate limiting para SSH"
+  become: yes
+  ansible.builtin.ufw:
+    rule: limit
+    port: '22'
+    proto: tcp
+    comment: 'SSH Rate Limiting'
+  when: firewall_ssh_rate_limit | default(true)
+  tags: firewall_protection
+
+# ✅ 10. Crear backup de reglas UFW
+- name: "💾 Crear directorio de backup para UFW"
+  become: yes
+  ansible.builtin.file:
+    path: "{{ firewall_backup_path | default('/var/backups/firewall') }}"
+    state: directory
+    mode: '0750'
+  when: firewall_backup_rules | default(true)
+  tags: firewall_backup
+
+- name: "💾 Backup de reglas UFW"
+  become: yes
+  ansible.builtin.copy:
+    src: "/etc/ufw/"
+    dest: "{{ firewall_backup_path | default('/var/backups/firewall') }}/ufw_backup_{{ ansible_date_time.date }}"
+    remote_src: yes
+    mode: '0640'
+  when: firewall_backup_rules | default(true)
+  tags: firewall_backup
+
+# ✅ 11. Configurar monitoreo de logs UFW
+- name: "📊 Crear script de monitoreo de firewall"
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/ufw_monitor.sh
+    content: |
+      #!/bin/bash
+      # Script de monitoreo de UFW
+      
+      LOG_FILE="/var/log/ufw_monitor.log"
+      UFW_LOG="/var/log/ufw.log"
+      
+      # Función de logging
+      log_message() {
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$LOG_FILE"
+      }
+      
+      # Verificar estado de UFW
+      if ! ufw status | grep -q "Status: active"; then
+          log_message "WARNING: UFW no está activo"
+          logger "WARNING: UFW firewall is not active"
+      fi
+      
+      # Contar bloqueos recientes (última hora)
+      if [ -f "$UFW_LOG" ]; then
+          BLOCKED_COUNT=$(grep "$(date '+%b %d %H:')" "$UFW_LOG" | grep "BLOCK" | wc -l)
+          if [ "$BLOCKED_COUNT" -gt 0 ]; then
+              log_message "INFO: $BLOCKED_COUNT conexiones bloqueadas en la última hora"
+          fi
+      fi
+      
+      # Verificar reglas críticas
+      if ! ufw status numbered | grep -q "22/tcp"; then
+          log_message "CRITICAL: Regla SSH no encontrada"
+          logger "CRITICAL: SSH rule missing in UFW"
+      fi
+    owner: root
+    group: root
+    mode: '0755'
+  when: firewall_monitoring | default(true)
+  tags: firewall_monitoring
+
+- name: "⏰ Programar monitoreo de firewall"
+  become: yes
+  ansible.builtin.cron:
+    name: "Monitoreo UFW"
+    minute: "*/10"
+    job: "/usr/local/bin/ufw_monitor.sh"
+    user: root
+  when: firewall_monitoring | default(true)
+  tags: firewall_monitoring
+
+# ✅ 12. Configuración de seguridad avanzada
+- name: "🔐 Configurar UFW para rechazar pings (opcional)"
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/ufw/before.rules
+    regexp: '^-A ufw-before-input -p icmp --icmp-type echo-request -j ACCEPT'
+    line: '-A ufw-before-input -p icmp --icmp-type echo-request -j DROP'
+    backup: yes
+  when: firewall_block_ping | default(false)
+  notify: reload ufw
+  tags: firewall_advanced
+
+# ✅ 13. Configurar aplicaciones predefinidas
+- name: "📱 Permitir aplicaciones UFW predefinidas"
+  become: yes
+  ansible.builtin.ufw:
+    rule: allow
+    name: "{{ item }}"
+  loop: "{{ firewall_allow_apps | default([]) }}"
+  tags: firewall_apps

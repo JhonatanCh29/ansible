@@ -1,0 +1,90 @@
+---
+# Variables por defecto para el rol firewall
+
+# Configuración básica del firewall
+firewall_enabled: true
+firewall_reset: false
+firewall_default_policy: 'deny'
+firewall_outgoing_policy: 'allow'
+
+# Servicios básicos a permitir
+firewall_allow_ssh: true
+firewall_allow_http: true
+firewall_allow_https: true
+
+# Configuración de logging
+firewall_logging: 'low'  # off, low, medium, high, full
+
+# Protección SSH
+firewall_ssh_rate_limit: true
+
+# Configuración de ping
+firewall_block_ping: false
+
+# Reglas personalizadas (ejemplo)
+firewall_custom_rules:
+  - rule: allow
+    port: '53'
+    proto: udp
+    comment: 'DNS queries'
+  - rule: allow
+    port: '123'
+    proto: udp
+    comment: 'NTP time sync'
+  # - rule: allow
+  #   port: '3306'
+  #   proto: tcp
+  #   src: '192.168.1.0/24'
+  #   comment: 'MySQL from LAN'
+
+# Aplicaciones UFW predefinidas a permitir
+firewall_allow_apps: []
+  # - 'OpenSSH'
+  # - 'Apache'
+  # - 'Nginx HTTPS'
+
+# Configuración de monitoreo
+firewall_monitoring: true
+
+# Configuración de backup
+firewall_backup_rules: true
+firewall_backup_path: "/var/backups/firewall"
+
+# Configuración de red del laboratorio
+lab_network: "192.168.50.0/24"
+wan_interface: "ens160"
+lan_interface: "ens192"
+
+# Puertos comunes del laboratorio
+lab_services:
+  ssh:
+    port: 22
+    proto: tcp
+    enabled: true
+  http:
+    port: 80
+    proto: tcp
+    enabled: true
+  https:
+    port: 443
+    proto: tcp
+    enabled: true
+  dns:
+    port: 53
+    proto: udp
+    enabled: true
+  dhcp:
+    port: 67
+    proto: udp
+    enabled: false
+
+# Configuración de seguridad avanzada
+security_config:
+  block_common_attacks: true
+  rate_limit_ssh: true
+  log_dropped_packets: true
+  backup_rules_daily: true
+
+# Variables del vault (serán sobrescritas por vault.yml)
+vault_admin_password: "default_password_change_me"
+vault_firewall_rules_backup_key: "backup_encryption_key"
