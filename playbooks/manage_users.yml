@@ -1,0 +1,127 @@
+---
+# 👥 Playbook Específico para Gestión Avanzada de Usuarios y Permisos
+
+- name: "👥 LABORATORIO - Implementación de Gestión de Usuarios Nivel 4"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars_files:
+    - group_vars/all/security.yml
+  
+  pre_tasks:
+    - name: "📋 Verificar sistema operativo compatible"
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian" or ansible_facts['os_family'] == "RedHat"
+        fail_msg: "❌ Sistema no compatible: {{ ansible_facts['os_family'] }}"
+        success_msg: "✅ Sistema compatible: {{ ansible_facts['os_family'] }}"
+    
+    - name: "🖥️ Mostrar información del sistema"
+      ansible.builtin.debug:
+        msg:
+          - "🏗️ Sistema: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "🔧 Arquitectura: {{ ansible_facts['architecture'] }}"
+          - "👤 Usuario actual: {{ ansible_user }}"
+          - "🏠 Directorio home: {{ ansible_env.HOME }}"
+
+  roles:
+    # 👤 Gestión completa de usuarios, grupos y permisos
+    - role: usuarios_permisos
+      tags: ['users', 'groups', 'permissions', 'management']
+
+  post_tasks:
+    # 🔍 Verificación de la implementación
+    - name: "🔍 Verificar grupos creados"
+      ansible.builtin.command: getent group {{ item }}
+      register: group_check
+      loop:
+        - admin_users
+        - developers
+        - operators
+        - backup_users
+        - audit_users
+      failed_when: group_check.rc != 0
+      changed_when: false
+    
+    - name: "👤 Verificar usuarios creados"
+      ansible.builtin.command: id {{ item }}
+      register: user_check
+      loop:
+        - lab_admin
+        - lab_operator
+        - lab_developer
+        - lab_audit
+        - lab_backup
+      failed_when: user_check.rc != 0
+      changed_when: false
+    
+    - name: "📁 Verificar directorios compartidos"
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: dir_check
+      loop:
+        - /home/shared/admin
+        - /home/shared/development
+        - /home/shared/operations
+        - /home/shared/backups
+        - /home/shared/audit
+      failed_when: not dir_check.stat.exists or not dir_check.stat.isdir
+    
+    - name: "🔐 Verificar configuración sudo"
+      ansible.builtin.stat:
+        path: /etc/sudoers.d/lab-users
+      register: sudo_config
+      failed_when: not sudo_config.stat.exists
+    
+    - name: "📊 Generar reporte de usuarios implementados"
+      ansible.builtin.template:
+        src: users_report.j2
+        dest: "/var/log/lab-users/implementation-{{ ansible_date_time.date }}.txt"
+        mode: '0644'
+      vars:
+        implementation_date: "{{ ansible_date_time.iso8601 }}"
+        hostname: "{{ ansible_hostname }}"
+        groups_created: "{{ group_check.results | length }}"
+        users_created: "{{ user_check.results | length }}"
+        directories_created: "{{ dir_check.results | length }}"
+    
+    # 🎉 Mensaje final de éxito
+    - name: "🎉 GESTIÓN DE USUARIOS COMPLETADA"
+      ansible.builtin.debug:
+        msg: |
+          
+          ═══════════════════════════════════════════════════════════════
+          🏆 GESTIÓN DE USUARIOS - NIVEL 4 IMPLEMENTADO EXITOSAMENTE
+          ═══════════════════════════════════════════════════════════════
+          
+          ✅ COMPONENTES IMPLEMENTADOS:
+          
+          👥 5 Grupos funcionales creados (admin_users, developers, etc.)
+          👤 5 Usuarios especializados configurados (lab_admin, lab_operator, etc.)
+          📁 5 Directorios compartidos con permisos específicos
+          🔐 Configuración sudo avanzada por grupos
+          🔒 Políticas robustas de contraseñas (12+ caracteres)
+          ⚖️ Límites de recursos configurados por usuario
+          📊 Herramientas de reporte y monitoreo
+          
+          ═══════════════════════════════════════════════════════════════
+          📋 CUMPLIMIENTO ACADÉMICO VERIFICADO:
+          
+          🎯 Nivel 4: ✅ Gestión avanzada de usuarios y permisos
+          👥 Grupos funcionales: ✅ Implementados con GIDs específicos
+          🔐 Seguridad: ✅ Políticas y privilegios diferenciados
+          📁 Estructura: ✅ Directorios compartidos organizados
+          
+          ═══════════════════════════════════════════════════════════════
+          🔧 COMANDOS DE VERIFICACIÓN:
+          
+          Ver usuarios:    getent passwd | grep lab_
+          Ver grupos:      getent group | grep -E "(admin_users|developers)"
+          Reporte:         sudo /usr/local/bin/lab-users-report
+          Directorios:     ls -la /home/shared/
+          Configuración:   sudo cat /etc/sudoers.d/lab-users
+          
+          ═══════════════════════════════════════════════════════════════
+          🚀 Sistema listo para demostración académica de gestión de usuarios
+          ═══════════════════════════════════════════════════════════════

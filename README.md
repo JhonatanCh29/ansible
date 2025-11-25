@@ -1,134 +1,246 @@
-# Proyecto Ansible
+# 🏫 LABORATORIO ANSIBLE - NIVEL ACADÉMICO 4
+## Gestión Avanzada de Sistemas y Seguridad
 
-Este repositorio contiene playbooks y roles para levantar un laboratorio de red
-con una VM que actúa como router/DHCP (`vm_jhonatan`) y clientes (`mint_jhonatan`).
+[![License](https://img.shields.io/badge/License-Academic-blue.svg)](LICENSE)
+[![Ansible](https://img.shields.io/badge/Ansible-2.9%2B-red.svg)](https://www.ansible.com/)
+[![Ubuntu](https://img.shields.io/badge/Ubuntu-20.04%2B-orange.svg)](https://ubuntu.com/)
 
-## 🚀 Guía de inicio rápido
+---
 
-### Pasos para preparar el nodo de control
+## 📋 **DESCRIPCIÓN DEL PROYECTO**
 
-1. **Ejecutar el script de bootstrap** para instalar dependencias en la VM de control:
-   ```bash
-   ./bootstrap_control.sh
-   ```
+Este repositorio contiene una implementación completa de un laboratorio de automatización con **Ansible** diseñado para cumplir con los estándares académicos de **Nivel 4** en:
 
-2. **Configurar claves SSH** y copiar la pública a las VMs objetivo:
-   ```bash
-   # desde la VM de control
-   cat ~/.ssh/id_ed25519.pub
-   # añadir esa clave en /home/jhonatan/.ssh/authorized_keys en cada VM
-   ```
+- 📊 **Unidad 2**: Gestión de Procesos y Servicios
+- 🔒 **Unidad 3**: Seguridad del Sistema Operativo
+- 👥 **Sistema Avanzado**: Gestión de Usuarios y Permisos
 
-3. **Configurar Ansible Vault** (recomendado para contraseñas):
-   ```bash
-   # Crear archivo cifrado con contraseñas
-   ansible-vault create group_vars/all/vault.yml
-   
-   # Dentro del archivo, definir variables como:
-   # vault_password_adminlab: "contraseña_segura"
-   # vault_password_tecnico1: "otra_contraseña"
-   # vault_password_profesor1: "otra_contraseña_más"
-   ```
+### 🎯 **Objetivos Académicos**
+- Demostrar competencias avanzadas en automatización de sistemas
+- Implementar medidas de seguridad empresarial
+- Gestionar usuarios y permisos de forma granular
+- Aplicar buenas prácticas de DevOps y administración de sistemas
 
-### 📋 Ejecución de playbooks
+---
 
-4. **Comprobaciones previas** (máquina control):
-   ```bash
-   # Activar venv si lo creaste con bootstrap_control.sh
-   source ~/.ansible-venv/bin/activate
-   
-   # Verificar sintaxis
-   ansible-lint .
-   ansible-playbook playbooks/setup_network_server.yml --syntax-check
-   
-   # Verificar conectividad
-   ansible all -m ping
-   ```
+## 🚀 **IMPLEMENTACIÓN RÁPIDA**
 
-5. **Ejecutar configuración principal**:
-   ```bash
-   # Configurar el servidor de red (vm_jhonatan)
+### **Opción 1: Implementación Automática (Recomendada)**
+```bash
+# 1. Clonar el repositorio
+git clone https://github.com/JhonatanCh29/ansible.git
+cd ansible
+
+# 2. Ejecutar implementación automática
+./implementar_laboratorio.sh
+```
+
+### **Opción 2: Implementación Manual**
+```bash
+# 1. Instalar dependencias
+sudo apt update && sudo apt install -y ansible python3 git
+
+# 2. Configurar SSH local
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+
+# 3. Ejecutar playbook
+ansible-playbook -i inventory/local_hosts.yml security_playbook.yml --ask-become-pass
    ansible-playbook playbooks/setup_network_server.yml --ask-vault-pass
    
-   # Verificar que todo funciona correctamente
-   ansible-playbook playbooks/verificacion_laboratorio.yml --ask-vault-pass
-   ```
-
-## 🎯 Características del proyecto (Nivel 4)
-
-### Gestión de procesos y servicios
-- ✅ Control avanzado con herramientas systemd
-- ✅ Monitoreo automático de servicios críticos
-- ✅ Reinicio automático de servicios fallidos
-- ✅ Optimización y alertas configurables
-
-### Gestión de seguridad por usuario
-- ✅ Políticas de contraseña definidas y validadas
-- ✅ Roles y permisos con restricciones claras
-- ✅ Auditoría automática de usuarios y actividades
-- ✅ Uso de Ansible Vault para secretos
-
-### Automatización de tareas
-- ✅ Automatización robusta y validada
-- ✅ Scripts idempotentes con manejo de errores
-- ✅ Validación automática de configuraciones
-- ✅ Reportes y alertas automatizadas
-
-### Administración de almacenamiento
-- ✅ Gestión avanzada con LVM y políticas claras
-- ✅ Monitoreo de espacio y alertas automáticas
-- ✅ Rotación de logs y backup automatizado
-- ✅ Políticas de limpieza y retención
-
-## 🔧 Estructura del proyecto
-
-```
-├── playbooks/
-│   ├── setup_network_server.yml      # Configuración principal del laboratorio
-│   ├── verificacion_laboratorio.yml  # Validación completa del sistema
-│   └── configure_vm_networks.yml     # Configuración de red específica
-├── roles/
-│   ├── red_lab/                      # Gestión de red y DHCP
-│   ├── procesos_servicios/           # Gestión de procesos y servicios
-│   ├── usuarios_permisos/            # Administración de usuarios y seguridad
-│   ├── tareas_automatizadas/         # Automatización y cron jobs
-│   └── almacenamiento_sistemas/      # Gestión de almacenamiento y backups
-├── inventory/
-│   ├── hosts.yml                     # Inventario de hosts
-│   └── group_vars/
-│       ├── lab_academico.yml         # Variables del grupo
-│       └── all/
-│           └── vault_example.yml     # Ejemplo para crear vault cifrado
-└── ansible.cfg                       # Configuración de Ansible
 ```
 
-## 📊 Monitoreo y validación
+---
 
-El proyecto incluye scripts automáticos de monitoreo que se ejecutan periódicamente:
+## 📁 **ESTRUCTURA DEL PROYECTO**
 
-- **Monitoreo de servicios**: Cada 5 minutos
-- **Verificación de disco**: Cada 15 minutos
-- **Auditoría de usuarios**: Diario a las 7:00
-- **Validación del sistema**: Diario a las 6:30
-- **Backup automático**: Configurable (por defecto 1:30 AM)
+```
+📦 ansible/
+├── 🎭 playbooks/
+│   ├── security_playbook.yml      # 🔒 Playbook principal de seguridad
+│   └── manage_users.yml           # 👥 Gestión de usuarios
+├── 🎪 roles/
+│   ├── seguridad_local/           # 🛡️  Antivirus y escaneo
+│   ├── proteccion_amenazas/       # 🔍 IDS/IPS y monitoreo
+│   ├── practicas_seguras_usuario/ # 🔐 Políticas de usuario
+│   └── usuarios_permisos/         # 👤 Gestión completa de usuarios
+├── 📊 inventory/
+│   ├── hosts.yml                  # 🌐 Inventario de red
+│   └── local_hosts.yml            # 💻 Configuración local
+├── ⚙️  group_vars/
+│   └── all/vault.yml              # 🔑 Variables de configuración
+├── 📚 Documentación/
+│   ├── DOCUMENTACION_COMPLETA.md  # 📖 Guía completa
+│   ├── GUIA_COMANDOS_RAPIDA.md    # ⚡ Comandos rápidos
+│   ├── GUIA_CAPTURAS_ACADEMICAS.md# 📸 Guía de capturas
+│   ├── GUIA_IMPLEMENTACION_DESDE_CERO.md # 🆕 Implementación desde cero
+│   └── SOLUCION_PROBLEMAS_RAPIDA.md # 🔧 Troubleshooting
+└── 🛠️  implementar_laboratorio.sh  # 🚀 Script de implementación automática
+```
 
-Los reportes se guardan en `/var/log/` en cada host y pueden ser revisados manualmente o enviados por email si se configura.
+---
 
-## 🔐 Notas de seguridad
+## 🔧 **COMPONENTES PRINCIPALES**
 
-- Este repositorio usa `become` en lugar de conectarse como root directamente
-- Las contraseñas deben almacenarse en `group_vars/all/vault.yml` cifrado
-- Los usuarios tienen permisos limitados según su rol (docentes, soporte, laboratorio)
-- Se incluye auditoría automática de actividades y cambios en el sistema
+### 🛡️ **SEGURIDAD DEL SISTEMA**
+| Componente | Función | Estado |
+|------------|---------|--------|
+| **ClamAV** | Antivirus con escaneo automático | ✅ Implementado |
+| **Fail2Ban** | Sistema IDS/IPS contra intrusiones | ✅ Implementado |
+| **AUDITD** | Auditoría del sistema en tiempo real | ✅ Implementado |
+| **AIDE** | Verificación de integridad de archivos | ✅ Implementado |
+| **UFW** | Firewall con reglas personalizadas | ✅ Implementado |
 
-## 🆘 Solución de problemas
+### 👥 **GESTIÓN DE USUARIOS**
+| Usuario | Grupo Principal | UID | Función |
+|---------|----------------|-----|---------|
+| **lab_admin** | admin_users | 3000 | Administrador del sistema |
+| **lab_operator** | operators | 3001 | Operaciones diarias |
+| **lab_developer** | developers | 3002 | Desarrollo y testing |
+| **lab_audit** | audit_users | 3003 | Auditoría y compliance |
+| **lab_backup** | backup_users | 3004 | Gestión de respaldos |
 
-1. **Error de conexión SSH**: Verificar que las claves públicas estén en `authorized_keys` de los hosts objetivo
-2. **Ansible pide contraseña**: Usar `--ask-vault-pass` si tienes vault cifrado
-3. **Servicios fallan**: Ejecutar el playbook de verificación para diagnóstico detallado
-4. **Problemas de permisos**: Verificar que `ansible_become: true` esté configurado en el grupo
+### 📁 **ESTRUCTURA DE DIRECTORIOS**
+```
+/opt/lab_data/
+├── shared/         # Espacio compartido (todos los usuarios)
+├── admin/          # Solo administradores
+├── development/    # Solo desarrolladores
+├── operations/     # Solo operadores
+├── backups/        # Solo equipo de backup
+└── audit/          # Solo equipo de auditoría
+```
 
-Para más ayuda, revisar los logs en `/var/log/` de cada host o ejecutar:
+---
+
+## ✅ **CUMPLIMIENTO ACADÉMICO**
+
+### 📊 **Nivel 4 - Unidad 2: Procesos y Servicios**
+- [x] Gestión automatizada de servicios del sistema
+- [x] Configuración de servicios críticos (SSH, Firewall, etc.)
+- [x] Monitoreo y mantenimiento automatizado
+- [x] Implementación de servicios de seguridad
+
+### 🔒 **Nivel 4 - Unidad 3: Seguridad del Sistema**
+- [x] Configuración avanzada de firewall (UFW)
+- [x] Sistema de detección de intrusiones (Fail2Ban)
+- [x] Antivirus con escaneo automatizado (ClamAV)
+- [x] Auditoría del sistema (AUDITD)
+- [x] Verificación de integridad (AIDE)
+- [x] Políticas de seguridad para usuarios
+- [x] Gestión granular de permisos
+
+---
+
+## 🎓 **DOCUMENTACIÓN ACADÉMICA**
+
+| Documento | Propósito | Nivel |
+|-----------|-----------|--------|
+| [📖 Documentación Completa](DOCUMENTACION_COMPLETA.md) | Guía técnica detallada | Avanzado |
+| [⚡ Comandos Rápidos](GUIA_COMANDOS_RAPIDA.md) | Referencia rápida | Básico |
+| [📸 Capturas Académicas](GUIA_CAPTURAS_ACADEMICAS.md) | Evidencias para evaluación | Académico |
+| [🆕 Implementación desde Cero](GUIA_IMPLEMENTACION_DESDE_CERO.md) | Despliegue en VM limpia | Intermedio |
+| [🔧 Solución de Problemas](SOLUCION_PROBLEMAS_RAPIDA.md) | Troubleshooting | Avanzado |
+
+---
+
+## 🔍 **VERIFICACIÓN Y TESTING**
+
+### **Verificación Rápida del Sistema**
 ```bash
-ansible-playbook playbooks/verificacion_laboratorio.yml --ask-vault-pass
+# Ejecutar verificación completa
+ansible-playbook playbooks/manage_users.yml
+
+# Verificar servicios de seguridad
+systemctl status clamav-daemon fail2ban auditd ufw
+
+# Verificar usuarios creados
+for user in lab_admin lab_operator lab_developer lab_audit lab_backup; do
+    echo "Usuario $user: $(id $user 2>/dev/null && echo 'OK' || echo 'NO ENCONTRADO')"
+done
 ```
+
+### **Testing de Seguridad**
+```bash
+# Verificar configuración de firewall
+sudo ufw status verbose
+
+# Verificar logs de Fail2Ban
+sudo fail2ban-client status
+
+# Verificar estado del antivirus
+sudo systemctl status clamav-daemon
+
+# Verificar auditoría del sistema
+sudo aureport --summary
+```
+
+---
+
+## 🆘 **SOLUCIÓN DE PROBLEMAS**
+
+### **Problemas Comunes y Soluciones Rápidas**
+
+| Problema | Solución Rápida |
+|----------|-----------------|
+| "No module named ansible" | `sudo apt install ansible` |
+| "Permission denied (publickey)" | Ver [guía SSH](SOLUCION_PROBLEMAS_RAPIDA.md#ssh) |
+| "sudo: a password is required" | Usar `--ask-become-pass` |
+| Servicios no se inician | Verificar logs: `journalctl -xe` |
+
+> 📚 **Para problemas específicos**: Consultar [SOLUCION_PROBLEMAS_RAPIDA.md](SOLUCION_PROBLEMAS_RAPIDA.md)
+
+---
+
+## 📈 **MÉTRICAS DE ÉXITO**
+
+### **Criterios de Evaluación Académica**
+- ✅ **Automatización**: Despliegue completo sin intervención manual
+- ✅ **Seguridad**: Todas las herramientas funcionando correctamente  
+- ✅ **Usuarios**: Sistema de gestión granular implementado
+- ✅ **Documentación**: Guías completas y casos de uso
+- ✅ **Troubleshooting**: Soluciones para problemas comunes
+- ✅ **Escalabilidad**: Fácil extensión y modificación
+
+### **Indicadores Técnicos**
+```bash
+# Comando de verificación completa
+curl -s https://raw.githubusercontent.com/JhonatanCh29/ansible/main/verificar_sistema.sh | bash
+```
+
+---
+
+## 🤝 **CONTRIBUCIONES Y SOPORTE**
+
+### **Información del Proyecto**
+- **Autor**: Jhonatan
+- **Curso**: Administración de Sistemas Operativos
+- **Nivel**: Académico 4
+- **Versión**: 2.0.0
+
+### **Repositorio**
+- **GitHub**: [JhonatanCh29/ansible](https://github.com/JhonatanCh29/ansible)
+- **Documentación**: Incluida en el repositorio
+- **Licencia**: Uso académico
+
+---
+
+## 🎯 **PRÓXIMOS PASOS**
+
+1. **Implementar**: Ejecutar `./implementar_laboratorio.sh`
+2. **Verificar**: Comprobar todos los servicios y usuarios
+3. **Documentar**: Tomar capturas para evidencia académica
+4. **Evaluar**: Verificar cumplimiento de rúbricas
+5. **Extender**: Agregar funcionalidades adicionales según necesidad
+
+---
+
+<div align="center">
+
+### 🎓 **¡LABORATORIO LISTO PARA EVALUACIÓN ACADÉMICA!**
+
+**Nivel 4 | Unidad 2 y 3 | Gestión Avanzada de Sistemas**
+
+*Automatización • Seguridad • Gestión de Usuarios • Documentación Completa*
+
+</div>

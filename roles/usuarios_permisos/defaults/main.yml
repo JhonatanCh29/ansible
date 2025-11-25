@@ -1,37 +1,70 @@
 ---
-# Variables por defecto para el rol usuarios_permisos
+# Variables por defecto para gestión de usuarios del laboratorio
 
-# Usuario administrador principal
-admin_user: "jhonatan"
-admin_group: "sudo"
-
-# Grupos a crear en el sistema
-user_groups:
-  - docentes
-  - soporte
-  - laboratorio
-
-# Usuarios a crear (sin contraseñas en texto plano - usar vault)
+# Lista de usuarios a crear
 lab_users:
-  - name: "adminlab"
-    group: "laboratorio"
-    sudo: true
-  - name: "tecnico1"
-    group: "soporte"
-    sudo: false
-  - name: "profesor1"
-    group: "docentes"
-    sudo: false
+  - username: "lab_admin"
+    uid: 3000
+    primary_group: "admin_users" 
+    groups: ["sudo", "adm", "audit_users"]
+    description: "Administrador del laboratorio"
+    shell: "/bin/bash"
+  - username: "lab_operator"
+    uid: 3001
+    primary_group: "operators"
+    groups: ["backup_users"]
+    description: "Operador del laboratorio"
+    shell: "/bin/bash"
+  - username: "lab_developer"
+    uid: 3002
+    primary_group: "developers"
+    groups: ["operators"]
+    description: "Desarrollador del laboratorio"
+    shell: "/bin/bash"
+  - username: "lab_audit"
+    uid: 3003
+    primary_group: "audit_users"
+    groups: []
+    description: "Usuario de auditoría (solo lectura)"
+    shell: "/bin/bash"
+  - username: "lab_backup"
+    uid: 3004
+    primary_group: "backup_users"
+    groups: []
+    description: "Usuario para tareas de backup"
+    shell: "/bin/bash"
 
-# Políticas de contraseña
+# Grupos del laboratorio
+lab_groups:
+  - name: "admin_users"
+    gid: 2000
+    description: "Administradores del laboratorio"
+  - name: "developers"
+    gid: 2001
+    description: "Desarrolladores y programadores"
+  - name: "operators"
+    gid: 2002
+    description: "Operadores de sistemas"
+  - name: "backup_users"
+    gid: 2003
+    description: "Usuarios para tareas de backup"
+  - name: "audit_users"
+    gid: 2004
+    description: "Usuarios de auditoría y monitoreo"
+
+# Políticas de contraseñas
 password_policy:
-  min_length: 8
-  require_special_chars: true
+  min_length: 12
   max_age_days: 90
+  min_age_days: 1
+  warn_age_days: 14
+  require_digits: true
+  require_uppercase: true
+  require_lowercase: true
+  require_special: true
 
-# Configuración de sudo
-sudo_nopasswd_users:
-  - "adminlab"
-
-# Directorio base para usuarios
-user_home_base: "/home"
+# Configuración de SSH
+ssh_config:
+  allow_groups: ["admin_users", "developers", "operators"]
+  deny_root_login: true
+  max_auth_tries: 3

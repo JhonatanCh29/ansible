@@ -58,10 +58,14 @@
         max_login_attempts: 3
         restrict_ssh_access: true
     
-    # 👥 5. GESTIÓN DE USUARIOS Y PERMISOS - Creación y configuración
+    # 👥 5. GESTIÓN AVANZADA DE USUARIOS - Creación y configuración completa
     - role: usuarios_permisos
-      tags: ['users', 'permissions', 'management']
-      when: manage_users | default(true)
+      tags: ['users', 'permissions', 'management', 'groups']
+      vars:
+        password_policy:
+          min_length: 12
+          max_age_days: 90
+          require_complex: true
 
   post_tasks:
     # 📊 Verificación del estado de seguridad
