@@ -1,0 +1,197 @@
+---
+# 🔒 Rol de Protección contra Amenazas - IDS/IPS y Monitoreo Activo
+
+# ✅ 1. Instalar y configurar Fail2Ban
+- name: Instalar Fail2Ban
+  become: yes
+  ansible.builtin.package:
+    name: fail2ban
+    state: present
+  when: fail2ban_enabled | default(true)
+  tags: fail2ban
+
+- name: Crear configuración personalizada de Fail2Ban
+  become: yes
+  ansible.builtin.template:
+    src: jail.local.j2
+    dest: /etc/fail2ban/jail.local
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  when: fail2ban_enabled | default(true)
+  notify: restart fail2ban
+  tags: fail2ban
+
+- name: Iniciar y habilitar servicio Fail2Ban
+  become: yes
+  ansible.builtin.service:
+    name: fail2ban
+    state: started
+    enabled: yes
+  when: fail2ban_enabled | default(true)
+  tags: fail2ban
+
+# ✅ 2. Instalar y configurar AIDE (Advanced Intrusion Detection Environment)
+- name: Instalar AIDE
+  become: yes
+  ansible.builtin.package:
+    name: aide
+    state: present
+  when: 
+    - aide_enabled | default(true)
+    - ansible_facts['os_family'] == "Debian"
+  tags: aide
+
+- name: Instalar AIDE en RedHat/Fedora
+  become: yes
+  ansible.builtin.package:
+    name: aide
+    state: present
+  when: 
+    - aide_enabled | default(true)
+    - ansible_facts['os_family'] == "RedHat"
+  tags: aide
+
+- name: Inicializar base de datos AIDE
+  become: yes
+  ansible.builtin.command: aide --init
+  args:
+    creates: /var/lib/aide/aide.db.new
+  when: aide_enabled | default(true)
+  tags: aide
+
+- name: Copiar base de datos AIDE inicial
+  become: yes
+  ansible.builtin.copy:
+    src: /var/lib/aide/aide.db.new
+    dest: /var/lib/aide/aide.db
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0600'
+  when: aide_enabled | default(true)
+  tags: aide
+
+- name: Programar verificación AIDE
+  become: yes
+  ansible.builtin.cron:
+    name: "Verificación integridad archivos AIDE"
+    minute: "0"
+    hour: "3"
+    job: "/usr/bin/aide --check | mail -s 'AIDE Report' {{ alert_email | default('admin@localhost') }}"
+    user: root
+  when: aide_enabled | default(true)
+  tags: aide
+
+# ✅ 3. Configurar monitoreo de procesos sospechosos
+- name: Crear script de monitoreo de procesos
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/monitor_processes.sh
+    content: |
+      #!/bin/bash
+      # Script de monitoreo de procesos sospechosos
+      
+      LOG_FILE="/var/log/security/process_monitor.log"
+      DATE=$(date '+%Y-%m-%d %H:%M:%S')
+      
+      # Procesos con alta CPU
+      HIGH_CPU=$(ps aux --sort=-%cpu | head -10 | awk '$3 > 80 {print $11}')
+      
+      # Procesos con nombres sospechosos
+      SUSPICIOUS=$(ps aux | grep -E "(nc|ncat|netcat|/tmp/|/var/tmp/)" | grep -v grep)
+      
+      # Conexiones de red sospechosas
+      CONNECTIONS=$(netstat -tulpn | grep -E ":22[0-9]{2}|:31[0-9]{2}")
+      
+      if [[ -n "$HIGH_CPU" || -n "$SUSPICIOUS" || -n "$CONNECTIONS" ]]; then
+          echo "[$DATE] ALERT: Actividad sospechosa detectada" >> $LOG_FILE
+          [[ -n "$HIGH_CPU" ]] && echo "[$DATE] Procesos alta CPU: $HIGH_CPU" >> $LOG_FILE
+          [[ -n "$SUSPICIOUS" ]] && echo "[$DATE] Procesos sospechosos: $SUSPICIOUS" >> $LOG_FILE
+          [[ -n "$CONNECTIONS" ]] && echo "[$DATE] Conexiones sospechosas: $CONNECTIONS" >> $LOG_FILE
+      fi
+    owner: root
+    group: root
+    mode: '0755'
+  tags: monitoring
+
+- name: Programar monitoreo de procesos
+  become: yes
+  ansible.builtin.cron:
+    name: "Monitoreo procesos sospechosos"
+    minute: "*/15"
+    job: "/usr/local/bin/monitor_processes.sh"
+    user: root
+  tags: monitoring
+
+# ✅ 4. Instalar y configurar auditd
+- name: Instalar auditd
+  become: yes
+  ansible.builtin.package:
+    name: auditd
+    state: present
+  when: auditd_enabled | default(true)
+  tags: auditd
+
+- name: Configurar reglas de auditoría
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/audit/rules.d/audit.rules
+    line: "{{ item }}"
+    create: yes
+  loop:
+    - "-w /etc/passwd -p wa -k identity"
+    - "-w /etc/shadow -p wa -k identity"
+    - "-w /etc/group -p wa -k identity"
+    - "-w /etc/sudoers -p wa -k identity"
+    - "-w /var/log/lastlog -p wa -k logins"
+    - "-w /bin/su -p x -k priv_esc"
+    - "-w /usr/bin/sudo -p x -k priv_esc"
+  when: auditd_enabled | default(true)
+  notify: restart auditd
+  tags: auditd
+
+- name: Iniciar y habilitar auditd
+  become: yes
+  ansible.builtin.service:
+    name: auditd
+    state: started
+    enabled: yes
+  when: auditd_enabled | default(true)
+  tags: auditd
+
+# ✅ 5. Configurar detección de rootkits en tiempo real
+- name: Crear script de detección de rootkits
+  become: yes
+  ansible.builtin.copy:
+    dest: /usr/local/bin/rootkit_check.sh
+    content: |
+      #!/bin/bash
+      # Script de detección de rootkits y malware
+      
+      LOG_FILE="/var/log/security/rootkit_check.log"
+      DATE=$(date '+%Y-%m-%d %H:%M:%S')
+      
+      echo "[$DATE] Iniciando verificación de rootkits..." >> $LOG_FILE
+      
+      # Verificar archivos modificados en /bin, /sbin, /usr/bin
+      find /bin /sbin /usr/bin -type f -mtime -1 >> $LOG_FILE 2>/dev/null
+      
+      # Verificar procesos ocultos
+      HIDDEN_PROCS=$(ps aux | wc -l)
+      LS_PROCS=$(ls -la /proc | grep '^d' | wc -l)
+      
+      if [ $((LS_PROCS - HIDDEN_PROCS)) -gt 10 ]; then
+          echo "[$DATE] ALERT: Posibles procesos ocultos detectados" >> $LOG_FILE
+      fi
+      
+      # Verificar modificaciones en archivos críticos del sistema
+      CHANGES=$(find /etc /bin /sbin /usr/bin -type f -mtime -1 2>/dev/null | wc -l)
+      if [ $CHANGES -gt 5 ]; then
+          echo "[$DATE] ALERT: $CHANGES archivos del sistema modificados recientemente" >> $LOG_FILE
+      fi
+    owner: root
+    group: root
+    mode: '0755'
+  tags: rootkit_detection

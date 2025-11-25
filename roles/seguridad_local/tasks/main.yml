@@ -1,0 +1,140 @@
+---
+# 🔒 Rol de Seguridad Local Básica - Antivirus y Protecciones
+
+# ✅ 1. Instalar y configurar antivirus ClamAV
+- name: Instalar ClamAV en sistemas Debian/Ubuntu
+  become: yes
+  ansible.builtin.package:
+    name:
+      - clamav
+      - clamav-daemon
+      - clamav-freshclam
+    state: present
+  when: 
+    - ansible_facts['os_family'] == "Debian"
+    - antivirus_enabled | default(true)
+  tags: antivirus
+
+- name: Instalar ClamAV en sistemas RedHat/Fedora
+  become: yes
+  ansible.builtin.package:
+    name:
+      - clamav
+      - clamav-update
+    state: present
+  when: 
+    - ansible_facts['os_family'] == "RedHat"
+    - antivirus_enabled | default(true)
+  tags: antivirus
+
+- name: Actualizar base de datos de virus
+  become: yes
+  ansible.builtin.command: freshclam
+  when: antivirus_enabled | default(true)
+  ignore_errors: yes
+  tags: antivirus
+
+- name: Crear directorio de cuarentena
+  become: yes
+  ansible.builtin.file:
+    path: "{{ antivirus_quarantine_dir | default('/var/lib/clamav/quarantine') }}"
+    state: directory
+    owner: clamav
+    group: clamav
+    mode: '0750'
+  when: antivirus_enabled | default(true)
+  tags: antivirus
+
+- name: Configurar escaneo programado con cron
+  become: yes
+  ansible.builtin.cron:
+    name: "Escaneo diario antivirus"
+    minute: "0"
+    hour: "2"
+    job: "/usr/bin/clamscan -r /home /var/www --move={{ antivirus_quarantine_dir | default('/var/lib/clamav/quarantine') }} --log=/var/log/clamav-scan.log"
+    user: root
+  when: antivirus_enabled | default(true)
+  tags: antivirus
+
+# ✅ 2. Instalar y configurar RKHunter (Rootkit Hunter)
+- name: Instalar RKHunter
+  become: yes
+  ansible.builtin.package:
+    name: rkhunter
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  tags: antivirus
+
+- name: Configurar RKHunter
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/rkhunter.conf
+    regexp: '^UPDATE_MIRRORS='
+    line: 'UPDATE_MIRRORS=1'
+    backup: yes
+  when: ansible_facts['os_family'] == "Debian"
+  tags: antivirus
+
+- name: Programar escaneo RKHunter
+  become: yes
+  ansible.builtin.cron:
+    name: "Escaneo rootkits"
+    minute: "30"
+    hour: "3"
+    job: "/usr/bin/rkhunter --checkall --skip-keypress --report-warnings-only"
+    user: root
+  when: ansible_facts['os_family'] == "Debian"
+  tags: antivirus
+
+# ✅ 3. Configurar logs de seguridad
+- name: Crear directorio de logs de seguridad
+  become: yes
+  ansible.builtin.file:
+    path: /var/log/security
+    state: directory
+    owner: root
+    group: adm
+    mode: '0750'
+  tags: logging
+
+- name: Configurar logrotate para logs de seguridad
+  become: yes
+  ansible.builtin.copy:
+    dest: /etc/logrotate.d/security-logs
+    content: |
+      /var/log/security/*.log {
+          daily
+          rotate 30
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root adm
+      }
+    owner: root
+    group: root
+    mode: '0644'
+  tags: logging
+
+# ✅ 4. Instalar herramientas básicas de seguridad
+- name: Instalar herramientas de seguridad básicas
+  become: yes
+  ansible.builtin.package:
+    name:
+      - chkrootkit
+      - lynis
+      - unattended-upgrades  # Solo en Debian/Ubuntu
+    state: present
+  when: ansible_facts['os_family'] == "Debian"
+  ignore_errors: yes
+  tags: security_tools
+
+- name: Configurar actualizaciones automáticas de seguridad
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/50unattended-upgrades
+    regexp: '^Unattended-Upgrade::Automatic-Reboot'
+    line: 'Unattended-Upgrade::Automatic-Reboot "false";'
+    backup: yes
+  when: ansible_facts['os_family'] == "Debian"
+  tags: security_tools

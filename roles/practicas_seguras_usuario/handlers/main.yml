@@ -1,0 +1,27 @@
+---
+# 🔒 Handlers para el Rol de Prácticas Seguras de Usuario
+
+- name: restart sshd
+  become: yes
+  ansible.builtin.service:
+    name: sshd
+    state: restarted
+  listen: "restart sshd"
+
+- name: restart ssh
+  become: yes
+  ansible.builtin.service:
+    name: ssh
+    state: restarted
+  listen: "restart sshd"
+
+- name: restart rsyslog
+  become: yes
+  ansible.builtin.service:
+    name: rsyslog
+    state: restarted
+
+- name: reload systemd
+  become: yes
+  ansible.builtin.systemd:
+    daemon_reload: yes

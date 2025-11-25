@@ -1,0 +1,36 @@
+# 🔐 Archivos Sensibles - NO SUBIR A GIT
+*.vault_pass
+.vault_pass
+vault_passwords/
+secrets/
+
+# 🗂️ Archivos Temporales
+tmp/
+*.tmp
+*.log
+.cache/
+__pycache__/
+
+# 🔧 Archivos de Editor
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+
+# 📁 Directorios de Sistema
+.DS_Store
+Thumbs.db
+
+# 📊 Logs de Ansible
+*.retry
+ansible.log
+
+# 🚫 Archivos de Backup
+*.bak
+*.backup
+*~
+
+# ⚠️ IMPORTANTE: El vault.yml está desencriptado, 
+# solo es un template. Para producción, encriptar con:
+# ansible-vault encrypt group_vars/all/vault.yml

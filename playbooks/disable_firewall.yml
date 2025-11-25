@@ -1,0 +1,71 @@
+---
+# Playbook para deshabilitar/stop/firewall en hosts del laboratorio
+# WARNING: Esto quita protecciones de red. Haz snapshot antes de ejecutar.
+
+- name: Disable firewalls on lab hosts
+  hosts: lab_academico
+  become: true
+  gather_facts: yes
+  vars:
+    nft_cmd: /usr/sbin/nft
+
+  tasks:
+    - name: Warn about action
+      ansible.builtin.debug:
+        msg: |
+          Este playbook detendrá y deshabilitará servicios de firewall (firewalld, ufw)
+          y vaciará reglas nftables si existen. Realiza un snapshot antes de continuar.
+
+    - name: Stop and disable firewalld (if installed)
+      ansible.builtin.service:
+        name: firewalld
+        state: stopped
+        enabled: no
+        masked: yes
+      ignore_errors: yes
+
+    - name: Disable and stop ufw (if installed)
+      ansible.builtin.service:
+        name: ufw
+        state: stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: Flush nftables ruleset if nft command exists
+      ansible.builtin.command:
+        cmd: "{{ nft_cmd }} flush ruleset"
+      args:
+        warn: false
+      when: ansible_facts['pkg_mgr'] is not defined or (ansible_facts['pkg_mgr'] is defined)
+      register: nft_flush
+      failed_when: false
+
+    - name: Remove nftables persistent file (if present) -- try common paths
+      ansible.builtin.file:
+        path: /etc/nftables.conf
+        state: absent
+      ignore_errors: yes
+
+    - name: Flush iptables rules (legacy) - nat and filter
+      ansible.builtin.command:
+        cmd: iptables -t nat -F || true && iptables -F || true && iptables -t nat -X || true && iptables -X || true
+      args:
+        warn: false
+      ignore_errors: yes
+
+    - name: Ensure firewalld package removed (optional) - try to remove on Debian/RedHat
+      ansible.builtin.package:
+        name: firewalld
+        state: absent
+      ignore_errors: yes
+
+    - name: Ensure ufw package removed (optional)
+      ansible.builtin.package:
+        name: ufw
+        state: absent
+      ignore_errors: yes
+
+    - name: Show result summary
+      ansible.builtin.debug:
+        msg: |
+          Intenté detener/deshabilitar/mask/firewall y limpiar nft/iptables. Revise cada host y pruebe conectividad.

@@ -1,0 +1,107 @@
+---
+# Variables de configuración de seguridad avanzada
+
+# ===== SEGURIDAD LOCAL BÁSICA =====
+security_local_enabled: true
+
+# Configuración de antivirus
+antivirus_enabled: true
+antivirus_type: "clamav"  # clamav o rkhunter
+antivirus_scan_schedule: "0 2 * * *"  # Diario a las 2:00 AM
+antivirus_quarantine_dir: "/var/lib/clamav/quarantine"
+
+# ===== PROTECCIÓN CONTRA AMENAZAS =====
+intrusion_detection_enabled: true
+
+# Fail2ban configuración
+fail2ban_enabled: true
+fail2ban_maxretry: 3
+fail2ban_bantime: 3600  # 1 hora
+fail2ban_findtime: 600  # 10 minutos
+
+# Configuración de servicios monitoreados por fail2ban
+fail2ban_services:
+  - name: "ssh"
+    port: "22"
+    protocol: "tcp"
+    logpath: "/var/log/auth.log"
+    maxretry: 3
+  - name: "apache"
+    port: "80,443"
+    protocol: "tcp"
+    logpath: "/var/log/apache2/access.log"
+    maxretry: 5
+    enabled: false
+
+# AIDE (Advanced Intrusion Detection Environment)
+aide_enabled: true
+aide_check_schedule: "0 3 * * *"  # Diario a las 3:00 AM
+
+# ===== PRÁCTICAS SEGURAS DE USUARIO =====
+user_security_enabled: true
+
+# Políticas de sesión
+session_timeout: 900  # 15 minutos
+max_login_attempts: 3
+account_lockout_time: 1800  # 30 minutos
+
+# Configuración de sudo
+sudo_log_enabled: true
+sudo_log_file: "/var/log/sudo.log"
+sudo_require_tty: true
+
+# ===== POLÍTICAS DE SEGURIDAD =====
+security_policies_enabled: true
+
+# Configuración de SELinux/AppArmor
+selinux_state: "enforcing"  # enforcing, permissive, disabled
+apparmor_enabled: true
+
+# Configuración de auditoría
+auditd_enabled: true
+auditd_rules:
+  - "-w /etc/passwd -p wa -k identity"
+  - "-w /etc/shadow -p wa -k identity"
+  - "-w /etc/group -p wa -k identity"
+  - "-w /etc/sudoers -p wa -k identity"
+  - "-w /var/log/lastlog -p wa -k logins"
+
+# ===== MONITOREO Y ALERTAS =====
+monitoring_advanced: true
+
+# Configuración de alertas por email
+alerts_enabled: true
+alert_email: "admin@laboratorio.local"
+
+# Monitoreo de recursos del sistema
+system_monitoring_enabled: true
+resource_thresholds:
+  cpu_usage: 80
+  memory_usage: 85
+  disk_usage: 90
+
+# Monitoreo de logs críticos
+log_monitoring_enabled: true
+critical_logs:
+  - "/var/log/auth.log"
+  - "/var/log/syslog" 
+  - "/var/log/apache2/error.log"
+
+# ===== CONFIGURACIONES DE HARDENING =====
+system_hardening_enabled: true
+
+# Configuraciones de red seguras
+network_security:
+  disable_ipv6: false
+  syn_cookies: true
+  ip_forwarding: false  # Solo true en el router
+  icmp_redirects: false
+
+# Configuraciones de servicios
+secure_services:
+  disable_unnecessary: true
+  services_to_disable:
+    - "telnet"
+    - "rsh"
+    - "rlogin"
+    - "ftp"

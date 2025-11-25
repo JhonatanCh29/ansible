@@ -1,0 +1,127 @@
+---
+# 📊 Playbook Principal de Seguridad - Cumplimiento Académico Nivel 4
+
+- name: "🔒 LABORATORIO DE SEGURIDAD - Implementación Completa"
+  hosts: all
+  become: yes
+  gather_facts: yes
+  
+  vars_files:
+    - group_vars/all/security.yml
+  
+  pre_tasks:
+    - name: "📋 Verificar sistema operativo soportado"
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['os_family'] == "Debian" or ansible_facts['os_family'] == "RedHat"
+        fail_msg: "❌ Sistema operativo no soportado: {{ ansible_facts['os_family'] }}"
+        success_msg: "✅ Sistema operativo soportado: {{ ansible_facts['os_family'] }}"
+    
+    - name: "🔍 Mostrar información del sistema"
+      ansible.builtin.debug:
+        msg:
+          - "🖥️  Sistema: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+          - "🏗️  Arquitectura: {{ ansible_facts['architecture'] }}"
+          - "💾 Memoria: {{ (ansible_facts['memtotal_mb']/1024)|round(1) }}GB"
+          - "💿 Espacio: {{ (ansible_facts['devices']['sda']['size']|default('N/A')) }}"
+
+  roles:
+    # 🔥 1. PROTECCIÓN BÁSICA - Firewall y reglas de red
+    - role: firewall
+      tags: ['firewall', 'network', 'basic']
+      vars:
+        firewall_enabled: true
+        firewall_default_policy: 'deny'
+    
+    # 🦠 2. SEGURIDAD LOCAL - Antivirus y detección de amenazas
+    - role: seguridad_local
+      tags: ['antivirus', 'security', 'scanning']
+      vars:
+        enable_clamav: true
+        enable_rkhunter: true
+        schedule_daily_scans: true
+    
+    # 🛡️ 3. PROTECCIÓN CONTRA AMENAZAS - IDS/IPS y monitoreo
+    - role: proteccion_amenazas
+      tags: ['ids', 'ips', 'monitoring', 'threats']
+      vars:
+        enable_fail2ban: true
+        enable_aide: true
+        enable_auditd: true
+        enable_process_monitor: true
+    
+    # 👤 4. GESTIÓN AVANZADA DE USUARIOS - Políticas y restricciones
+    - role: practicas_seguras_usuario
+      tags: ['users', 'policies', 'restrictions']
+      vars:
+        session_timeout: 900
+        max_login_attempts: 3
+        restrict_ssh_access: true
+    
+    # 👥 5. GESTIÓN DE USUARIOS Y PERMISOS - Creación y configuración
+    - role: usuarios_permisos
+      tags: ['users', 'permissions', 'management']
+      when: manage_users | default(true)
+
+  post_tasks:
+    # 📊 Verificación del estado de seguridad
+    - name: "🔍 Verificar servicios de seguridad activos"
+      ansible.builtin.service_facts:
+      
+    - name: "✅ Mostrar estado de servicios críticos"
+      ansible.builtin.debug:
+        msg: |
+          🔒 ESTADO DE SEGURIDAD DEL SISTEMA:
+          
+          🦠 ClamAV: {{ 'ACTIVO' if services['clamav-daemon.service']['state'] == 'running' else 'INACTIVO' }}
+          🛡️ Fail2Ban: {{ 'ACTIVO' if services['fail2ban.service']['state'] == 'running' else 'INACTIVO' }}
+          📋 Auditd: {{ 'ACTIVO' if services['auditd.service']['state'] == 'running' else 'INACTIVO' }}
+          🔥 UFW: {{ 'ACTIVO' if services['ufw.service']['state'] == 'running' else 'INACTIVO' }}
+          🔐 SSH: {{ 'ACTIVO' if services['sshd.service']['state'] == 'running' or services['ssh.service']['state'] == 'running' else 'INACTIVO' }}
+      ignore_errors: yes
+
+    # 📁 Crear reporte de cumplimiento
+    - name: "📊 Crear directorio de reportes"
+      ansible.builtin.file:
+        path: /var/log/security-compliance
+        state: directory
+        mode: '0755'
+      
+    - name: "📋 Generar reporte de cumplimiento académico"
+      ansible.builtin.template:
+        src: templates/compliance_report.j2
+        dest: "/var/log/security-compliance/compliance-{{ ansible_date_time.date }}.txt"
+        mode: '0644'
+      vars:
+        timestamp: "{{ ansible_date_time.iso8601 }}"
+        hostname: "{{ ansible_hostname }}"
+    
+    # 🎯 Mensaje final de estado
+    - name: "🎉 IMPLEMENTACIÓN COMPLETADA"
+      ansible.builtin.debug:
+        msg: |
+          
+          ═══════════════════════════════════════════════════════════════
+          🏆 LABORATORIO DE SEGURIDAD - NIVEL 4 IMPLEMENTADO
+          ═══════════════════════════════════════════════════════════════
+          
+          ✅ COMPONENTES INSTALADOS:
+          
+          🔥 Firewall configurado con políticas restrictivas
+          🦠 Antivirus ClamAV con escaneos automáticos
+          🛡️ IDS/IPS Fail2Ban contra ataques de fuerza bruta
+          📋 Sistema de auditoría AUDITD para monitoreo
+          🔍 AIDE para integridad de archivos críticos
+          👤 Políticas avanzadas de usuario y sesión
+          📊 Monitoreo de procesos y actividad del sistema
+          
+          ═══════════════════════════════════════════════════════════════
+          📊 CUMPLIMIENTO ACADÉMICO:
+          
+          📚 Unidad 2: ✅ Nivel 4 - Configuración de red avanzada
+          🔒 Unidad 3: ✅ Nivel 4 - Seguridad integral del sistema
+          
+          ═══════════════════════════════════════════════════════════════
+          📁 Reportes disponibles en: /var/log/security-compliance/
+          🔧 Configuración en: /home/jhonatan/ansible/
+          ═══════════════════════════════════════════════════════════════

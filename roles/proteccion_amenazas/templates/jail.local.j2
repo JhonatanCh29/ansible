@@ -1,0 +1,49 @@
+[DEFAULT]
+# Configuración global de Fail2Ban
+bantime = {{ fail2ban_bantime | default(3600) }}
+findtime = {{ fail2ban_findtime | default(600) }}
+maxretry = {{ fail2ban_maxretry | default(3) }}
+
+# Email de notificaciones (opcional)
+{% if alert_email is defined %}
+destemail = {{ alert_email }}
+sendername = Fail2Ban-{{ ansible_hostname }}
+mta = sendmail
+action = %(action_mwl)s
+{% endif %}
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = {{ fail2ban_maxretry | default(3) }}
+bantime = {{ fail2ban_bantime | default(3600) }}
+
+[apache-auth]
+enabled = false
+port = http,https
+filter = apache-auth
+logpath = /var/log/apache*/*error.log
+maxretry = 5
+
+[apache-badbots]
+enabled = false
+port = http,https
+filter = apache-badbots
+logpath = /var/log/apache*/*access.log
+maxretry = 2
+
+[apache-noscript]
+enabled = false
+port = http,https
+filter = apache-noscript
+logpath = /var/log/apache*/*access.log
+maxretry = 6
+
+[apache-overflows]
+enabled = false
+port = http,https
+filter = apache-overflows
+logpath = /var/log/apache*/*error.log
+maxretry = 2

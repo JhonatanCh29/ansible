@@ -1,0 +1,46 @@
+---
+# 🔐 Variables Encriptadas con Ansible Vault
+# Este archivo debe ser encriptado con: ansible-vault encrypt group_vars/all/vault.yml
+
+# 🔑 Credenciales del Sistema
+vault_admin_password: "TuPasswordSeguro123!"
+vault_mysql_root_password: "MySQL_Root_Pass_2024!"
+vault_postgresql_password: "PostgreSQL_Pass_2024!"
+
+# 🌐 Claves API y Servicios Externos
+vault_api_key: "tu-clave-api-secreta-aqui"
+vault_github_token: "ghp_tu_token_de_github_aqui"
+vault_smtp_password: "password_correo_smtp"
+
+# 🔐 Clave SSH Privada (Ejemplo - Reemplaza con tu clave real)
+vault_ssh_private_key: |
+  -----BEGIN OPENSSH PRIVATE KEY-----
+  # Aquí va tu clave SSH privada real
+  # Genera una con: ssh-keygen -t rsa -b 4096 -C "tu@email.com"
+  -----END OPENSSH PRIVATE KEY-----
+
+# 🔐 Clave Pública SSH Correspondiente
+vault_ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... tu_usuario@hostname"
+
+# 🛡️ Certificados SSL/TLS (si los usas)
+vault_ssl_cert: |
+  -----BEGIN CERTIFICATE-----
+  # Aquí va tu certificado SSL si lo necesitas
+  -----END CERTIFICATE-----
+
+vault_ssl_private_key: |
+  -----BEGIN PRIVATE KEY-----
+  # Aquí va la clave privada del certificado SSL
+  -----END PRIVATE KEY-----
+
+# 🔐 Tokens de Seguridad
+vault_jwt_secret: "tu-jwt-secret-muy-seguro-aqui"
+vault_encryption_key: "clave-de-encriptacion-de-32-caracteres"
+
+# 🌍 Variables de Entorno Sensibles
+vault_database_url: "postgresql://usuario:password@localhost:5432/basedatos"
+vault_redis_url: "redis://localhost:6379"
+
+# 🔑 Credenciales de Servicios
+vault_ldap_bind_password: "password_ldap_bind"
+vault_backup_encryption_key: "clave-para-encriptar-backups"

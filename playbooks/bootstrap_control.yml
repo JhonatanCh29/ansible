@@ -12,6 +12,7 @@
     - name: Ensure apt cache is updated
       ansible.builtin.apt:
         update_cache: yes
+      become: true
 
     - name: Install system packages
       ansible.builtin.apt:
@@ -25,16 +26,28 @@
           - vim
         state: present
         install_recommends: no
+      become: true
 
     - name: Set control user and venv path
       ansible.builtin.set_fact:
         control_user: control
         venv_path: "/home/control/.ansible-venv"
 
+    - name: Ensure 'control' user exists
+      ansible.builtin.user:
+        name: control
+        comment: "Ansible control user"
+        create_home: yes
+        shell: /bin/bash
+        state: present
+      become: true
+
     - name: Create python virtualenv for control user
       ansible.builtin.command:
         cmd: python3 -m venv {{ venv_path }}
         creates: "{{ venv_path }}/bin/activate"
+      become: true
+      become_user: control
 
     - name: Install python packages (ansible-core, ansible-lint, yamllint) into the venv
       ansible.builtin.pip:
@@ -43,10 +56,14 @@
           - ansible-lint
           - yamllint
         virtualenv: "{{ venv_path }}"
+      become: true
+      become_user: control
 
     - name: Install common Ansible collections (community.general, ansible.posix, community.crypto) into the user's environment
       ansible.builtin.command:
         cmd: "{{ venv_path }}/bin/ansible-galaxy collection install community.general ansible.posix community.crypto"
+      become: true
+      become_user: control
 
     - name: Ensure venv ownership is control user
       ansible.builtin.file:
@@ -56,11 +73,14 @@
         recurse: yes
       become: true
 
-    - name: Ensure ~/.ssh exists
+    - name: Ensure control user's ~/.ssh exists
       ansible.builtin.file:
-        path: "{{ lookup('env','HOME') }}/.ssh"
+        path: "/home/control/.ssh"
         state: directory
+        owner: control
+        group: control
         mode: '0700'
+      become: true
 
     - name: Ensure control user's .ssh directory exists
       ansible.builtin.file:
@@ -77,12 +97,16 @@
       ansible.builtin.command:
         cmd: ssh-keygen -t ed25519 -f /home/control/.ssh/id_ed25519 -N '' -C 'control@lab'
         creates: /home/control/.ssh/id_ed25519
-      become: false
+      become: true
+      become_user: control
 
-    - name: Ensure key file permissions are correct
+    - name: Ensure key file ownership and permissions are correct
       ansible.builtin.file:
         path: /home/control/.ssh/id_ed25519
+        owner: control
+        group: control
         mode: '0600'
+      become: true
       when: control_key_stat.stat.exists
 
     - name: Configure passwordless sudo for 'control' user (NOPASSWD)

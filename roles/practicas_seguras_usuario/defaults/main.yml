@@ -1,0 +1,20 @@
+---
+# Configuración por defecto para prácticas seguras de usuario
+
+# Timeouts de sesión
+session_timeout: 900  # 15 minutos
+
+# Políticas de login
+max_login_attempts: 3
+account_lockout_time: 1800  # 30 minutos
+
+# Configuración de sudo
+sudo_require_tty: true
+sudo_log_file: "/var/log/sudo.log"
+
+# Configuración SSH
+restrict_ssh_access: true
+allowed_ssh_groups: "users"
+
+# Servicios
+disable_at_daemon: true

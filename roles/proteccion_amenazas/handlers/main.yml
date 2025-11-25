@@ -1,0 +1,12 @@
+---
+- name: restart fail2ban
+  become: yes
+  ansible.builtin.service:
+    name: fail2ban
+    state: restarted
+
+- name: restart auditd
+  become: yes
+  ansible.builtin.service:
+    name: auditd
+    state: restarted

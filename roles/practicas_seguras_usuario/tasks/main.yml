@@ -1,0 +1,173 @@
+---
+# 🔒 Rol de Prácticas Seguras de Usuario - Políticas y Restricciones
+
+# ✅ 1. Configurar políticas de sesión y timeouts
+- name: Configurar timeout de sesión en /etc/profile
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/profile
+    regexp: '^export TMOUT='
+    line: 'export TMOUT={{ session_timeout | default(900) }}'
+    backup: yes
+  tags: session_policies
+
+- name: Configurar timeout para SSH
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^ClientAliveInterval'
+    line: 'ClientAliveInterval {{ (session_timeout | default(900)) // 3 }}'
+    backup: yes
+  notify: restart sshd
+  tags: ssh_security
+
+- name: Configurar ClientAliveCountMax para SSH
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^ClientAliveCountMax'
+    line: 'ClientAliveCountMax 3'
+    backup: yes
+  notify: restart sshd
+  tags: ssh_security
+
+# ✅ 2. Configurar políticas de intentos de login
+- name: Configurar bloqueo de cuenta tras intentos fallidos
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/common-auth
+    insertafter: '^auth.*pam_unix.so'
+    line: 'auth required pam_tally2.so deny={{ max_login_attempts | default(3) }} unlock_time={{ account_lockout_time | default(1800) }} onerr=fail audit even_deny_root'
+    backup: yes
+  when: ansible_facts['os_family'] == "Debian"
+  tags: login_policies
+
+# ✅ 3. Configurar sudo con logging y restricciones
+- name: Configurar logging detallado de sudo
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regexp: '^Defaults.*logfile'
+    line: 'Defaults logfile="{{ sudo_log_file | default("/var/log/sudo.log") }}"'
+    validate: 'visudo -cf %s'
+    backup: yes
+  tags: sudo_security
+
+- name: Requerir TTY para sudo
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regexp: '^Defaults.*requiretty'
+    line: 'Defaults requiretty'
+    validate: 'visudo -cf %s'
+    backup: yes
+  when: sudo_require_tty | default(true)
+  tags: sudo_security
+
+- name: Configurar timeout para sudo
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regexp: '^Defaults.*timestamp_timeout'
+    line: 'Defaults timestamp_timeout=5'
+    validate: 'visudo -cf %s'
+    backup: yes
+  tags: sudo_security
+
+# ✅ 4. Configurar políticas de contraseñas avanzadas
+- name: Configurar longitud mínima de contraseña
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MIN_LEN'
+    line: 'PASS_MIN_LEN 12'
+    backup: yes
+  tags: password_policies
+
+- name: Configurar expiración de contraseñas
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_MAX_DAYS'
+    line: 'PASS_MAX_DAYS 90'
+    backup: yes
+  tags: password_policies
+
+- name: Configurar días de advertencia antes de expiración
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^PASS_WARN_AGE'
+    line: 'PASS_WARN_AGE 14'
+    backup: yes
+  tags: password_policies
+
+# ✅ 5. Configurar restricciones de acceso por usuario
+- name: Crear grupo de usuarios privilegiados
+  become: yes
+  ansible.builtin.group:
+    name: admin_users
+    state: present
+  tags: user_groups
+
+- name: Limitar acceso SSH a usuarios específicos
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^AllowGroups'
+    line: 'AllowGroups admin_users {{ allowed_ssh_groups | default("users") }}'
+    backup: yes
+  notify: restart sshd
+  when: restrict_ssh_access | default(true)
+  tags: ssh_security
+
+# ✅ 6. Configurar auditoría de accesos de usuario
+- name: Configurar logging de intentos de login
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/rsyslog.conf
+    regexp: '^auth,authpriv'
+    line: 'auth,authpriv.* /var/log/security/auth.log'
+    backup: yes
+  notify: restart rsyslog
+  tags: user_auditing
+
+- name: Crear directorio de logs de seguridad si no existe
+  become: yes
+  ansible.builtin.file:
+    path: /var/log/security
+    state: directory
+    owner: root
+    group: adm
+    mode: '0750'
+  tags: user_auditing
+
+# ✅ 7. Configurar umask seguro
+- name: Configurar umask seguro en /etc/profile
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/profile
+    regexp: '^umask'
+    line: 'umask 022'
+    backup: yes
+  tags: file_permissions
+
+- name: Configurar umask para usuarios en /etc/login.defs
+  become: yes
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^UMASK'
+    line: 'UMASK 022'
+    backup: yes
+  tags: file_permissions
+
+# ✅ 8. Deshabilitar servicios innecesarios para usuarios
+- name: Deshabilitar at daemon si no es necesario
+  become: yes
+  ansible.builtin.service:
+    name: atd
+    state: stopped
+    enabled: no
+  ignore_errors: yes
+  when: disable_at_daemon | default(false)
+  tags: service_hardening

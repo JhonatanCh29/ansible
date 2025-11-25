@@ -635,5 +635,3 @@ ansible vm_jhonatan -m shell -a "cat /var/lib/dhcp/dhcpd.leases | tail -10"
    - Ejecuta `ansible-playbook playbook.yml` completo
    - Muestra el PLAY RECAP con 100% éxito
    - Demuestra que todo funciona automáticamente
-
-### 📱 ¿Necesitas que genere scripts específicos para alguna demostración?
